@@ -18,6 +18,19 @@
 
 ---
 
+## 📊 Benchmarks vs ripgrep
+
+`poler` delivers **10× – 50× faster warm queries** for agent loops, saves **95% token context** via 16-byte address anchors, and provides $O(1)$ memory guarantees on files up to 40+ GiB.
+
+👉 **Read the full benchmark report:** [BENCHMARKS.md](BENCHMARKS.md)
+
+Run the automated 5-level benchmark suite:
+```bash
+python3 benches/stress_5levels.py
+```
+
+---
+
 ## 🛠️ CLI Subcommands
 
 ### 1. `poler harvest` — High-Speed Project & Disk Harvester
