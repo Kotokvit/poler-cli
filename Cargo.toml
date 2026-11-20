@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Kotokvit / POLER Engineering Core"]
 description = "Sovereign Ultra-Fast Filesystem Harvester, Grep, Zero-Copy Piece-Table Editor & AI-Agent MCP Engine"
 license-file = "LICENSE"
-repository = "https://github.com/poler-engine-org/poler"
+repository = "https://github.com/Kotokvit/poler-cli"
 keywords = ["search", "harvester", "editor", "piece-table", "mcp", "grep"]
 categories = ["command-line-utilities", "development-tools", "filesystem"]
 

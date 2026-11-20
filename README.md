@@ -142,6 +142,28 @@ cargo test
 
 ---
 
+## 💖 Sponsorship & Direct Donations
+
+If `poler` saves you time, compute resources, and thousands of API context tokens:
+
+* **USDT (TRC-20):** `THLxXNLxxoYA5rgyinypexiaD3Nb9iXo7a`  
+  *(TRON Network, verify on [Tronscan](https://tronscan.org/#/address/THLxXNLxxoYA5rgyinypexiaD3Nb9iXo7a))*
+* **Binance Pay ID:** `892674734` *(User: User-770b3 — zero-fee instant transfer worldwide)*
+* **GitHub Sponsors:** [github.com/sponsors/Kotokvit](https://github.com/sponsors/Kotokvit)
+
+---
+
+## 📬 Contact & Enterprise B2B Licensing
+
+For commercial licensing (closed-source embedding, custom engine pipelines, high-throughput cluster indexing), consulting, or security inquiries:
+
+- **Architect & Author:** Vitalij Kotok (Kotokvit)
+- **Email:** [vitalijkotok18@gmail.com](mailto:vitalijkotok18@gmail.com)
+- **GitHub:** [https://github.com/Kotokvit](https://github.com/Kotokvit)
+- **Phone:** +380 93 798 1708
+
+---
+
 ## 📄 License
 
 Licensed under the MIT License or Apache-2.0 License.
