@@ -842,6 +842,16 @@ mod tests {
 
     #[test]
     fn test_save_pdf_buffer_cyrillic() {
+        let has_soffice = std::process::Command::new("soffice")
+            .arg("--version")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if !has_soffice {
+            eprintln!("Skipping test_save_pdf_buffer_cyrillic: LibreOffice (soffice) not found in PATH");
+            return;
+        }
+
         let dir = tempfile::tempdir().unwrap();
         let pdf_file = dir.path().join("cyrillic_test.pdf");
         let cyrillic_text = "Сводная карта Кассиопея и Этерия (POLER)\nСтрока 142: Перемещение Алексея между Землёй и Этерией.\nТопология P³ и каузальный проектор.";

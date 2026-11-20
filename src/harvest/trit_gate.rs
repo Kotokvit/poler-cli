@@ -34,8 +34,10 @@
 //! Генератор `scripts/gen_asm_consts.py` пенсионирован: таблицы v0.88
 //! выводит нативный `calc` движка.
 
+#[cfg(all(target_arch = "x86_64", unix))]
 use std::arch::global_asm;
 
+#[cfg(all(target_arch = "x86_64", unix))]
 global_asm! {
     r#"
     .text
@@ -438,6 +440,7 @@ poler_trit_mux512:
     "#
 }
 
+#[cfg(all(target_arch = "x86_64", unix))]
 extern "sysv64" {
     fn poler_trit_neg(a: *const i8, out: *mut i8, n: usize);
     fn poler_trit_and(a: *const i8, b: *const i8, out: *mut i8, n: usize);
@@ -470,6 +473,7 @@ pub struct AsmCaps {
 }
 
 impl AsmCaps {
+    #[cfg(target_arch = "x86_64")]
     fn detect() -> Self {
         Self {
             avx2: is_x86_feature_detected!("avx2"),
@@ -483,6 +487,21 @@ impl AsmCaps {
             sse41: is_x86_feature_detected!("sse4.1"),
         }
     }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    fn detect() -> Self {
+        Self {
+            avx2: false,
+            fma: false,
+            f16c: false,
+            popcnt: false,
+            avx512f: false,
+            sse2: false,
+            avx: false,
+            ssse3: false,
+            sse41: false,
+        }
+    }
 }
 
 static CAPS: OnceLock<AsmCaps> = OnceLock::new();
@@ -492,14 +511,26 @@ pub fn caps() -> AsmCaps {
 }
 
 fn trit_simd_ready() -> bool {
-    let c = caps();
-    c.avx && c.ssse3 && c.sse41
+    #[cfg(all(target_arch = "x86_64", unix))]
+    {
+        let c = caps();
+        c.avx && c.ssse3 && c.sse41
+    }
+    #[cfg(not(all(target_arch = "x86_64", unix)))]
+    {
+        false
+    }
 }
 
 /// Инверсия трит-вектора: out = −a (поразрядно). Хвост — скалярно.
 pub fn neg(a: &[i8], out: &mut [i8]) {
     let n = a.len().min(out.len());
+    #[cfg(all(target_arch = "x86_64", unix))]
     let bulk = if trit_simd_ready() { n / 16 * 16 } else { 0 };
+    #[cfg(not(all(target_arch = "x86_64", unix)))]
+    let bulk = 0;
+
+    #[cfg(all(target_arch = "x86_64", unix))]
     if bulk > 0 {
         unsafe { poler_trit_neg(a.as_ptr(), out.as_mut_ptr(), bulk) };
     }
@@ -511,7 +542,12 @@ pub fn neg(a: &[i8], out: &mut [i8]) {
 /// Вентиль Клини AND = min (трёхзначная логика). Хвост — скалярно.
 pub fn kleene_and(a: &[i8], b: &[i8], out: &mut [i8]) {
     let n = a.len().min(b.len()).min(out.len());
+    #[cfg(all(target_arch = "x86_64", unix))]
     let bulk = if trit_simd_ready() { n / 16 * 16 } else { 0 };
+    #[cfg(not(all(target_arch = "x86_64", unix)))]
+    let bulk = 0;
+
+    #[cfg(all(target_arch = "x86_64", unix))]
     if bulk > 0 {
         unsafe { poler_trit_and(a.as_ptr(), b.as_ptr(), out.as_mut_ptr(), bulk) };
     }
@@ -523,7 +559,12 @@ pub fn kleene_and(a: &[i8], b: &[i8], out: &mut [i8]) {
 /// Вентиль Клини OR = max. Хвост — скалярно.
 pub fn kleene_or(a: &[i8], b: &[i8], out: &mut [i8]) {
     let n = a.len().min(b.len()).min(out.len());
+    #[cfg(all(target_arch = "x86_64", unix))]
     let bulk = if trit_simd_ready() { n / 16 * 16 } else { 0 };
+    #[cfg(not(all(target_arch = "x86_64", unix)))]
+    let bulk = 0;
+
+    #[cfg(all(target_arch = "x86_64", unix))]
     if bulk > 0 {
         unsafe { poler_trit_or(a.as_ptr(), b.as_ptr(), out.as_mut_ptr(), bulk) };
     }
@@ -539,11 +580,11 @@ pub fn dot(a: &[i8], b: &[i8]) -> i64 {
     if n == 0 {
         return 0;
     }
+    #[cfg(all(target_arch = "x86_64", unix))]
     if trit_simd_ready() {
-        unsafe { poler_trit_dot(a.as_ptr(), b.as_ptr(), n) }
-    } else {
-        a.iter().zip(b).map(|(&x, &y)| x as i64 * y as i64).sum()
+        return unsafe { poler_trit_dot(a.as_ptr(), b.as_ptr(), n) };
     }
+    a.iter().zip(b).map(|(&x, &y)| x as i64 * y as i64).sum()
 }
 
 /// Упаковка 5 сбалансированных тритов в байт: V = Σ(tₖ+1)·3ᵏ ≤ 242.
@@ -556,7 +597,21 @@ pub fn pack5(trits: &[i8], out: &mut [u8]) -> usize {
     if n_bytes == 0 || out.len() < n_bytes {
         return 0;
     }
+    #[cfg(all(target_arch = "x86_64", unix))]
     unsafe { poler_trit_pack5(trits.as_ptr(), out.as_mut_ptr(), n) }
+
+    #[cfg(not(all(target_arch = "x86_64", unix)))]
+    {
+        for j in 0..n_bytes {
+            let mut v = 0u8;
+            for k in 0..5 {
+                let t = (trits[j * 5 + k] + 1) as u8;
+                v = v * 3 + t;
+            }
+            out[j] = v;
+        }
+        n_bytes
+    }
 }
 
 /// Распаковка байтов в 5 тритов (magic-деление на 3, без `div`).
@@ -566,7 +621,21 @@ pub fn unpack5(packed: &[u8], out: &mut [i8]) -> usize {
     if n_bytes == 0 || out.len() < n_bytes * 5 {
         return 0;
     }
+    #[cfg(all(target_arch = "x86_64", unix))]
     unsafe { poler_trit_unpack5(packed.as_ptr(), out.as_mut_ptr(), n_bytes) }
+
+    #[cfg(not(all(target_arch = "x86_64", unix)))]
+    {
+        for j in 0..n_bytes {
+            let mut v = packed[j];
+            for k in (0..5).rev() {
+                let rem = v % 3;
+                v /= 3;
+                out[j * 5 + k] = (rem as i8) - 1;
+            }
+        }
+        n_bytes * 5
+    }
 }
 
 /// Тернарный спайк: x → {+1.0, 0.0, −1.0} с мёртвой зоной [−θ, θ].
@@ -580,6 +649,7 @@ pub fn spike_f32(x: &[f32], out: &mut [f32], theta: f32) {
     let c = caps();
     if c.avx512f {
         let bulk = n / 16 * 16;
+        #[cfg(all(target_arch = "x86_64", unix))]
         if bulk > 0 {
             unsafe { poler_trit_spike_f32_avx512(x.as_ptr(), out.as_mut_ptr(), bulk, theta) };
         }
@@ -593,8 +663,20 @@ pub fn spike_f32(x: &[f32], out: &mut [f32], theta: f32) {
             };
         }
     } else {
-        // SSE2-ядро обрабатывает всё, включая хвост
-        unsafe { poler_trit_spike_f32(x.as_ptr(), out.as_mut_ptr(), n, theta) };
+        #[cfg(all(target_arch = "x86_64", unix))]
+        if c.sse2 {
+            unsafe { poler_trit_spike_f32(x.as_ptr(), out.as_mut_ptr(), n, theta) };
+            return;
+        }
+        for i in 0..n {
+            out[i] = if x[i] > theta {
+                1.0
+            } else if x[i] < -theta {
+                -1.0
+            } else {
+                0.0
+            };
+        }
     }
 }
 
@@ -608,6 +690,7 @@ pub fn mux512(a: &[u32], b: &[u32], sel: &[u32], out: &mut [u32]) {
     }
     let c = caps();
     let bulk = if c.avx512f { n / 16 * 16 } else { 0 };
+    #[cfg(all(target_arch = "x86_64", unix))]
     if bulk > 0 {
         unsafe { poler_trit_mux512(a.as_ptr(), b.as_ptr(), sel.as_ptr(), out.as_mut_ptr(), bulk) };
     }

@@ -2503,6 +2503,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn broken_symlink_skipped_gracefully() {
         let d = tmpdir("broken_symlink");
         put(&d.join("good.txt"), "гамильтониан системы");

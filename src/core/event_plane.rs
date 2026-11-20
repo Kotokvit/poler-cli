@@ -13,6 +13,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
+#[cfg(unix)]
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -21,7 +22,38 @@ use std::thread;
 
 use serde::{Deserialize, Serialize};
 
+#[cfg(unix)]
 pub const DEFAULT_SOCKET_PATH: &str = "/tmp/poler-event.sock";
+#[cfg(not(unix))]
+pub const DEFAULT_SOCKET_PATH: &str = "poler-event.sock";
+
+#[cfg(not(unix))]
+#[derive(Debug)]
+pub struct UnixStream;
+
+#[cfg(not(unix))]
+impl std::io::Write for UnixStream {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[cfg(not(unix))]
+impl std::io::Read for UnixStream {
+    fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
+        Ok(0)
+    }
+}
+
+#[cfg(not(unix))]
+impl UnixStream {
+    pub fn try_clone(&self) -> std::io::Result<Self> {
+        Ok(UnixStream)
+    }
+}
 const RING_BUFFER_CAPACITY: usize = 256;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -259,6 +291,7 @@ impl EventPlane {
         clients.retain_mut(|stream| stream.write_all(bytes).is_ok());
     }
 
+    #[cfg(unix)]
     pub fn start(self: Arc<Self>) -> std::io::Result<()> {
         if self.socket_path.exists() {
             let _ = fs::remove_file(&self.socket_path);
@@ -279,6 +312,11 @@ impl EventPlane {
                 }
             })?;
 
+        Ok(())
+    }
+
+    #[cfg(not(unix))]
+    pub fn start(self: Arc<Self>) -> std::io::Result<()> {
         Ok(())
     }
 
@@ -344,29 +382,37 @@ impl EventClient {
     }
 
     pub fn connect_path<P: AsRef<Path>>(path: P) -> Result<Self, String> {
-        let stream = UnixStream::connect(path).map_err(|e| format!("UDS connect error: {e}"))?;
-        let read_clone = stream.try_clone().map_err(|e| format!("clone error: {e}"))?;
-        let mut client = Self {
-            stream,
-            reader: BufReader::new(read_clone),
-        };
+        #[cfg(unix)]
+        {
+            let stream = UnixStream::connect(path).map_err(|e| format!("UDS connect error: {e}"))?;
+            let read_clone = stream.try_clone().map_err(|e| format!("clone error: {e}"))?;
+            let mut client = Self {
+                stream,
+                reader: BufReader::new(read_clone),
+            };
 
-        // Отправляем Hello
-        let hello = Event::Hello {
-            client_name: "poler-client".to_string(),
-            version: 1,
-            capabilities: vec!["causal_intercept".into()],
-        };
-        client.send(&hello)?;
+            // Отправляем Hello
+            let hello = Event::Hello {
+                client_name: "poler-client".to_string(),
+                version: 1,
+                capabilities: vec!["causal_intercept".into()],
+            };
+            client.send(&hello)?;
 
-        // Читаем HelloAck
-        let mut ack_line = String::new();
-        client
-            .reader
-            .read_line(&mut ack_line)
-            .map_err(|e| format!("read ack error: {e}"))?;
+            // Читаем HelloAck
+            let mut ack_line = String::new();
+            client
+                .reader
+                .read_line(&mut ack_line)
+                .map_err(|e| format!("read ack error: {e}"))?;
 
-        Ok(client)
+            Ok(client)
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = path;
+            Err("UDS Event Plane is not supported on Windows/non-Unix targets".to_string())
+        }
     }
 
     pub fn send(&mut self, ev: &Event) -> Result<(), String> {

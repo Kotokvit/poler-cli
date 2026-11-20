@@ -146,20 +146,20 @@ struct GrepCli {
 fn print_help() {
     println!(
         "poler {} — Sovereign Ultra-Fast Harvester, Grep, Zero-Copy Piece-Table & AI MCP Engine\n\n\
-         ИСПОЛЬЗОВАНИЕ:\n  \
-           poler <КОМАНДА> [АРГУМЕНТЫ...]\n\n\
-         ОСНОВНЫЕ КОМАНДЫ:\n  \
-           poler harvest <ROOT> \"<QUERY>\" [flags]   Полнодисковый сбор с кэшем L1-L3 (.t5a) и ANSI-подсветкой\n  \
-           poler grep \"<PATTERN>\" [PATH] [flags]    Потоковый grep по проекту с учётом .gitignore (замена ripgrep)\n  \
-           poler edit [PATH]                       Запуск stdio JSON-RPC ядра редактора для IDE и агентов\n  \
-           poler view <PATH> [--lines A..B]        Мгновенный просмотр текста, 40 ГБ логов, DOCX, EPUB, PDF\n  \
-           poler patch <PATH> <OLD> <NEW>          Атомарная хирургическая замена текста в файле или архиве\n  \
-           poler diff <PATH>                       Показать diff несохранённых правок Piece-Table\n  \
-           poler mcp                               Запуск единого MCP-сервера для Claude/Cursor/Antigravity\n  \
-           poler schema                            Самодокументирующийся JSON-манифест всех инструментов\n\n\
-         СОВМЕСТИМОСТЬ:\n  \
-           poler-harvest ...                       Прямой алиас подкоманды 'harvest'\n  \
-           poler-edit-core ...                     Прямой алиас подкоманды 'edit'\n",
+         USAGE:\n  \
+           poler <COMMAND> [ARGS...]\n\n\
+         CORE COMMANDS:\n  \
+           poler harvest <ROOT> \"<QUERY>\" [flags]   Full-disk harvest with L1-L3 cache (.t5a) & ANSI highlighting\n  \
+           poler grep \"<PATTERN>\" [PATH] [flags]    Streaming project grep with .gitignore awareness\n  \
+           poler edit [PATH]                       Launch stdio JSON-RPC editor core for IDEs and agents\n  \
+           poler view <PATH> [--lines A..B]        Instant viewer for text, 40GB logs, DOCX, EPUB, PDF\n  \
+           poler patch <PATH> <OLD> <NEW>          Atomic surgical text replacement in file or archive\n  \
+           poler diff <PATH>                       Show diff of unsaved Piece-Table modifications\n  \
+           poler mcp                               Unified stdio MCP server for Claude/Cursor/Antigravity\n  \
+           poler schema                            Self-documenting JSON manifest of all tools\n\n\
+         ALIASES:\n  \
+           poler-harvest ...                       Direct alias for 'harvest' subcommand\n  \
+           poler-edit-core ...                     Direct alias for 'edit' subcommand\n",
         env!("CARGO_PKG_VERSION")
     );
 }
@@ -250,14 +250,14 @@ fn run_harvest_cli(args: &[String]) -> ExitCode {
     }
     let query = cli.query_flag.or(cli.query);
     let Some(query) = query else {
-        eprintln!("poler harvest: ошибка: не указан поисковый запрос (QUERY)");
-        eprintln!("Использование: poler harvest <ROOT_DIR> <QUERY> [FORMAT]");
+        eprintln!("poler harvest: error: missing search query (QUERY)");
+        eprintln!("Usage: poler harvest <ROOT_DIR> <QUERY> [FORMAT]");
         return ExitCode::from(2);
     };
 
     if roots.is_empty() {
-        eprintln!("poler harvest: ошибка: не указан корневой каталог (ROOT_DIR)");
-        eprintln!("Использование: poler harvest <ROOT_DIR> <QUERY> [FORMAT]");
+        eprintln!("poler harvest: error: missing root directory (ROOT_DIR)");
+        eprintln!("Usage: poler harvest <ROOT_DIR> <QUERY> [FORMAT]");
         return ExitCode::from(2);
     }
 
@@ -294,7 +294,7 @@ fn run_harvest_cli(args: &[String]) -> ExitCode {
             let color_stats = cli.color.should_color(is_stderr_tty);
             eprintln!("{}", stats.summary_line_colored(color_stats));
             if stats.read_errors > 0 {
-                eprintln!("poler harvest: ошибок чтения: {}", stats.read_errors);
+                eprintln!("poler harvest: read errors: {}", stats.read_errors);
             }
             if stats.files_selected == 0 {
                 ExitCode::from(1)
@@ -303,7 +303,7 @@ fn run_harvest_cli(args: &[String]) -> ExitCode {
             }
         }
         Err(e) => {
-            eprintln!("poler harvest: ошибка: {e}");
+            eprintln!("poler harvest: error: {e}");
             ExitCode::from(2)
         }
     }
@@ -373,7 +373,7 @@ fn run_grep_cli(args: &[String]) -> ExitCode {
             }
         }
         Err(e) => {
-            eprintln!("poler grep: ошибка: {e}");
+            eprintln!("poler grep: error: {e}");
             ExitCode::from(2)
         }
     }
@@ -381,7 +381,7 @@ fn run_grep_cli(args: &[String]) -> ExitCode {
 
 fn run_view_cli(args: &[String]) -> ExitCode {
     if args.is_empty() {
-        eprintln!("Использование: poler view <PATH[::ENTRY]> [--lines START..END]");
+        eprintln!("Usage: poler view <PATH[::ENTRY]> [--lines START..END]");
         return ExitCode::from(2);
     }
     let target_spec = &args[0];
@@ -392,11 +392,11 @@ fn run_view_cli(args: &[String]) -> ExitCode {
     };
 
     if !path.exists() {
-        eprintln!("poler view: файл не найден: {}", path.display());
+        eprintln!("poler view: file not found: {}", path.display());
         return ExitCode::from(2);
     }
 
-    // Если это VFS-контейнер и указана конкретная запись:
+    // If VFS container and specific entry specified:
     if let Some(entry) = entry_from_spec {
         let norm = poler_cli::core::vfs::norm_name(&entry);
         match poler_cli::core::vfs::vfs_read(&path, &norm, 4 << 20) {
@@ -406,18 +406,18 @@ fn run_view_cli(args: &[String]) -> ExitCode {
                     return ExitCode::SUCCESS;
                 }
                 Err(_) => {
-                    eprintln!("poler view: запись {norm} содержит бинарные данные");
+                    eprintln!("poler view: entry '{norm}' contains binary data");
                     return ExitCode::from(1);
                 }
             },
             Err(e) => {
-                eprintln!("poler view: ошибка чтения записи {norm}: {e}");
+                eprintln!("poler view: failed to read entry '{norm}': {e}");
                 return ExitCode::from(1);
             }
         }
     }
 
-    // Если это документ (DOCX, EPUB, PDF, MOBI, FB2) — извлекаем чистый текст
+    // If document (DOCX, EPUB, PDF, MOBI, FB2) — extract clean text
     if poler_cli::core::extractor::is_extractable_format(&path) {
         match poler_cli::core::extractor::extract_text(&path) {
             Ok(Some(text)) => {
@@ -426,29 +426,29 @@ fn run_view_cli(args: &[String]) -> ExitCode {
             }
             Ok(None) => {}
             Err(e) => {
-                eprintln!("poler view: ошибка извлечения: {e}");
+                eprintln!("poler view: text extraction error: {e}");
                 return ExitCode::from(1);
             }
         }
     }
 
-    // Если это VFS-контейнер (.zip, .tar, .poler и т.д.) без указания записи —
-    // выводим листинг контейнера вместо сырых байтов архива!
+    // If VFS container (.zip, .tar, .poler, etc.) without entry specified —
+    // print formatted archive listing instead of dumping raw binary bytes!
     if poler_cli::core::vfs::is_vfs_container(&path) {
         match poler_cli::core::vfs::vfs_list(&path) {
             Ok((kind, entries)) => {
-                println!("{kind:?} контейнер: {} (всего записей: {})", path.display(), entries.len());
+                println!("{kind:?} container: {} (total entries: {})", path.display(), entries.len());
                 for e in entries.iter().take(50) {
                     let d = if e.is_dir { "/" } else { "" };
                     println!("{:>10}  {}{}", e.size, e.name, d);
                 }
                 if entries.len() > 50 {
-                    println!("... и ещё {} записей (для просмотра записи: poler view {}::<ENTRY>)", entries.len() - 50, path.display());
+                    println!("... and {} more entries (view entry: poler view {}::<ENTRY>)", entries.len() - 50, path.display());
                 }
                 return ExitCode::SUCCESS;
             }
             Err(e) => {
-                eprintln!("poler view: ошибка листинга архива: {e}");
+                eprintln!("poler view: archive listing error: {e}");
                 return ExitCode::from(1);
             }
         }
@@ -474,18 +474,18 @@ fn run_view_cli(args: &[String]) -> ExitCode {
                 Ok(span) => {
                     print!("{}", span.text);
                     if span.byte_capped {
-                        eprintln!("\n[poler view: вывод усечён до 4 МиБ, общий размер: {} байт]", total_len);
+                        eprintln!("\n[poler view: output capped at 4 MiB, total size: {} bytes]", total_len);
                     }
                     ExitCode::SUCCESS
                 }
                 Err(e) => {
-                    eprintln!("poler view: ошибка чтения: {e}");
+                    eprintln!("poler view: read error: {e}");
                     ExitCode::from(1)
                 }
             }
         }
         Err(e) => {
-            eprintln!("poler view: ошибка открытия: {e}");
+            eprintln!("poler view: open error: {e}");
             ExitCode::from(1)
         }
     }
@@ -493,7 +493,7 @@ fn run_view_cli(args: &[String]) -> ExitCode {
 
 fn run_patch_cli(args: &[String]) -> ExitCode {
     if args.len() < 3 {
-        eprintln!("Использование: poler patch <PATH[::ENTRY]> <OLD_TEXT> <NEW_TEXT> [--entry <ENTRY>]");
+        eprintln!("Usage: poler patch <PATH[::ENTRY]> <OLD_TEXT> <NEW_TEXT> [--entry <ENTRY>]");
         return ExitCode::from(2);
     }
     let target_spec = &args[0];
@@ -520,18 +520,17 @@ fn run_patch_cli(args: &[String]) -> ExitCode {
     let target_entry = entry_override.or(entry_from_spec);
 
     if !path.exists() {
-        eprintln!("poler patch: файл не найден: {}", path.display());
+        eprintln!("poler patch: file not found: {}", path.display());
         return ExitCode::from(2);
     }
 
-    // Если это VFS-контейнер (.zip, .docx, .epub, .odt, .jar, .tar, .poler и т.д.) —
-    // КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО открывать его как сырой буфер (это ломает CRC32 и структуру архива).
-    // Работаем строго через CoW VFS и flush_archive!
+    // If VFS container (.zip, .docx, .epub, .odt, .jar, .tar, .poler, etc.) —
+    // route through CoW VFS and flush_archive to preserve container structure and CRC-32!
     if poler_cli::core::vfs::is_vfs_container(&path) {
         let entry_name = match target_entry {
             Some(e) => poler_cli::core::vfs::norm_name(&e),
             None => {
-                // Если запись не указана явно — сканируем записи архива на совпадение с old_text
+                // Auto-detect target entry containing old_text if not specified
                 match poler_cli::core::vfs::vfs_list(&path) {
                     Ok((_, entries)) => {
                         let mut candidates = Vec::new();
@@ -545,30 +544,30 @@ fn run_patch_cli(args: &[String]) -> ExitCode {
                             }
                         }
                         if candidates.is_empty() {
-                            eprintln!("poler patch: текст {:?} не найден ни в одной записи архива {}", old_text, path.display());
+                            eprintln!("poler patch: pattern {:?} not found in any entry of archive {}", old_text, path.display());
                             return ExitCode::from(1);
                         } else if candidates.len() == 1 {
                             let chosen = candidates.remove(0);
-                            eprintln!("poler patch: обнаружена целевая запись '{}' в архиве {}", chosen, path.display());
+                            eprintln!("poler patch: auto-detected target entry '{}' in archive {}", chosen, path.display());
                             chosen
                         } else {
-                            eprintln!("poler patch: текст найден в нескольких записях: {:?}. Укажите конкретную запись: poler patch {}::<ENTRY> {:?} {:?}", candidates, path.display(), old_text, new_text);
+                            eprintln!("poler patch: pattern found in multiple entries: {:?}. Specify target entry: poler patch {}::<ENTRY> {:?} {:?}", candidates, path.display(), old_text, new_text);
                             return ExitCode::from(1);
                         }
                     }
                     Err(e) => {
-                        eprintln!("poler patch: ошибка чтения контейнера {}: {e}", path.display());
+                        eprintln!("poler patch: container read error for {}: {e}", path.display());
                         return ExitCode::from(1);
                     }
                 }
             }
         };
 
-        // Читаем запись через vfs_read
+        // Read entry via vfs_read
         let bytes = match poler_cli::core::vfs::vfs_read(&path, &entry_name, poler_cli::core::vfs::DEFAULT_MAX_ENTRY_BYTES) {
             Ok(b) => b,
             Err(e) => {
-                eprintln!("poler patch: ошибка чтения записи {entry_name}: {e}");
+                eprintln!("poler patch: failed to read entry '{entry_name}': {e}");
                 return ExitCode::from(1);
             }
         };
@@ -576,7 +575,7 @@ fn run_patch_cli(args: &[String]) -> ExitCode {
         let text = match String::from_utf8(bytes) {
             Ok(t) => t,
             Err(_) => {
-                eprintln!("poler patch: запись {entry_name} содержит бинарные данные, текстовая правка невозможна");
+                eprintln!("poler patch: entry '{entry_name}' contains binary data, text patching not supported");
                 return ExitCode::from(1);
             }
         };
@@ -590,17 +589,17 @@ fn run_patch_cli(args: &[String]) -> ExitCode {
                 ov.write(&entry_name, new_bytes);
                 match poler_cli::core::vfs_edit::flush_archive(&path, &ov, &path, poler_cli::core::vfs_edit::DEFAULT_MAX_WRITE_BYTES) {
                     Ok(stats) => {
-                        eprintln!("poler patch: успешно обновлена запись '{}' в архиве ({} байт)", entry_name, stats.bytes);
+                        eprintln!("poler patch: successfully patched entry '{}' in archive ({} bytes)", entry_name, stats.bytes);
                         ExitCode::SUCCESS
                     }
                     Err(e) => {
-                        eprintln!("poler patch: ошибка пересборки архива: {e}");
+                        eprintln!("poler patch: failed to rebuild archive: {e}");
                         ExitCode::from(1)
                     }
                 }
             }
             Err(e) => {
-                eprintln!("poler patch: замена не удалась: {e}");
+                eprintln!("poler patch: replacement failed: {e}");
                 ExitCode::from(1)
             }
         }
@@ -610,22 +609,22 @@ fn run_patch_cli(args: &[String]) -> ExitCode {
                 match b.replace_match(old_text, new_text, None, None, false, true) {
                     Ok(_) => match b.save() {
                         Ok(bytes) => {
-                            eprintln!("poler patch: успешно обновлено ({} байт)", bytes);
+                            eprintln!("poler patch: successfully patched ({} bytes)", bytes);
                             ExitCode::SUCCESS
                         }
                         Err(e) => {
-                            eprintln!("poler patch: ошибка сохранения: {e}");
+                            eprintln!("poler patch: save error: {e}");
                             ExitCode::from(1)
                         }
                     },
                     Err(e) => {
-                        eprintln!("poler patch: замена не удалась: {e}");
+                        eprintln!("poler patch: replacement failed: {e}");
                         ExitCode::from(1)
                     }
                 }
             }
             Err(e) => {
-                eprintln!("poler patch: ошибка открытия файла: {e}");
+                eprintln!("poler patch: failed to open file: {e}");
                 ExitCode::from(1)
             }
         }
@@ -634,7 +633,7 @@ fn run_patch_cli(args: &[String]) -> ExitCode {
 
 fn run_diff_cli(args: &[String]) -> ExitCode {
     if args.is_empty() {
-        eprintln!("Использование: poler diff <PATH>");
+        eprintln!("Usage: poler diff <PATH>");
         return ExitCode::from(2);
     }
     let path = PathBuf::from(&args[0]);
@@ -652,7 +651,7 @@ fn run_diff_cli(args: &[String]) -> ExitCode {
             }
         }
         Err(e) => {
-            eprintln!("poler diff: ошибка: {e}");
+            eprintln!("poler diff: error: {e}");
             ExitCode::from(1)
         }
     }
@@ -674,7 +673,7 @@ fn run_edit_cli(args: &[String]) -> ExitCode {
     // Если передан флаг --exec
     if let Some(pos) = args.iter().position(|a| a == "--exec") {
         let Some(raw) = args.get(pos + 1) else {
-            eprintln!("{{\"ok\":false,\"error\":\"--exec требует аргумент\"}}");
+            eprintln!("{{\"ok\":false,\"error\":\"--exec requires an argument\"}}");
             return ExitCode::from(2);
         };
         let trimmed = raw.trim();
@@ -758,7 +757,7 @@ fn main() -> ExitCode {
             run_edit_cli(&args[1..])
         }
         other => {
-            eprintln!("poler: неизвестная команда '{other}'. Используйте 'poler --help'.");
+            eprintln!("poler: unknown command '{other}'. Use 'poler --help'.");
             ExitCode::from(1)
         }
     }

@@ -1,5 +1,9 @@
 # `poler` — Sovereign Ultra-Fast CLI Suite
 
+[![Rust CI](https://github.com/Kotokvit/poler-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/Kotokvit/poler-cli/actions/workflows/ci.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/Kotokvit/poler-cli?color=blue)](https://github.com/Kotokvit/poler-cli/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 > **Sovereign Ultra-Fast Filesystem Harvester, Parallel Grep, Zero-Copy Piece-Table Editor & AI-Agent MCP Engine.**
 
 `poler` is a unified, high-performance terminal utility and AI-agent interface written in pure Rust (2021 edition). It combines disk-crawling indexing, parallel text matching, memory-mapped zero-copy editing, and Model Context Protocol (MCP) tool exposure into a single ~7 MB self-contained binary.

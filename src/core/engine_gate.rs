@@ -360,7 +360,7 @@ impl EngineDaemon {
         // (loopback + случайный токен), path-jail снимаем осознанно —
         // см. док-комментарий модуля.
         cmd.env("POLER_MCP_ALLOW_ANY_PATH", "1");
-        #[cfg(unix)]
+        #[cfg(target_os = "linux")]
         unsafe {
             use std::os::unix::process::CommandExt;
             // Демон не переживает родителя даже при SIGKILL ядра.
