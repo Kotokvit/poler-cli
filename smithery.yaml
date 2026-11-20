@@ -1,0 +1,30 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+name: poler-cli
+version: 0.97.0
+description: AI-native search, zero-copy piece-table editor & 39 resident MCP tools in Rust (2ms L1/L3 crystals, 90% token reduction vs ripgrep)
+author: Kotokvit
+repository: https://github.com/Kotokvit/poler-cli
+license: Custom
+category: developer-tools
+tags:
+  - mcp
+  - search
+  - ripgrep
+  - rust
+  - ai-agents
+  - piece-table
+  - zero-copy
+  - fastcdc
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties: {}
+  commandFunction: |-
+    (config) => ({
+      command: 'poler',
+      args: ['mcp'],
+      env: {}
+    })
+  exampleConfig: {}
