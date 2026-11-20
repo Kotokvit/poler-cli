@@ -22,10 +22,13 @@
 
 `poler` delivers **10× – 50× faster warm queries** for agent loops, saves **95% token context** via 16-byte address anchors, and provides $O(1)$ memory guarantees on files up to 40+ GiB.
 
+![Poler vs Ripgrep Head-to-Head Battle](assets/battle_benchmark.png)
+
 👉 **Read the full benchmark report:** [BENCHMARKS.md](BENCHMARKS.md)
 
-Run the automated 5-level benchmark suite:
+Run the head-to-head battle or the automated 5-level stress suite:
 ```bash
+python3 benches/battle_rg.py /path/to/codebase
 python3 benches/stress_5levels.py
 ```
 

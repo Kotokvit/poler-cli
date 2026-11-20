@@ -32,6 +32,17 @@ In 2026, the primary consumer of codebase search is an **autonomous AI agent** (
 
 ---
 
+## ⚡ Live Head-to-Head Speed & Token Battle
+
+Reproduce locally with:
+```bash
+python3 benches/battle_rg.py /path/to/codebase
+```
+
+![Poler vs Ripgrep Head-to-Head Battle](assets/battle_benchmark.png)
+
+---
+
 ## 🧪 The 5-Level Architectural Test Suite
 
 The repository includes a self-contained benchmark suite (`benches/stress_5levels.py`) verifying core performance invariants:
