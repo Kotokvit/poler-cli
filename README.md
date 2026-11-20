@@ -1,0 +1,134 @@
+# `poler` — Sovereign Ultra-Fast CLI Suite
+
+> **Sovereign Ultra-Fast Filesystem Harvester, Parallel Grep, Zero-Copy Piece-Table Editor & AI-Agent MCP Engine.**
+
+`poler` is a unified, high-performance terminal utility and AI-agent interface written in pure Rust (2021 edition). It combines disk-crawling indexing, parallel text matching, memory-mapped zero-copy editing, and Model Context Protocol (MCP) tool exposure into a single ~7 MB self-contained binary.
+
+---
+
+## ⚡ Key Highlights
+
+- **Zero-Copy Piece-Table Buffer ($O(1)$ RAM footprint):** Instantly opens and edits files of arbitrary size (tested on **40 GiB** files in milliseconds with < 100 KB metadata).
+- **L1–L3 Address Crystal (`.t5a`):** Hardware-aligned 16-byte address anchors for instant subsequent searches in **2–20 ms** without re-reading the filesystem.
+- **Parallel Grep:** Native multi-threaded regex and literal scanner respecting `.gitignore`, with context lines (`-A`, `-B`, `-C`) and pipe-safe ANSI color formatting.
+- **Archive & Document VFS:** In-place inspection and surgical editing of `.docx`, `.epub`, `.odt`, `.pdf`, `.zip`, `.tar`, and `.tar.gz`.
+- **$GF(3)$ Balanced Trit Syntax Protection:** Protects code and documents from syntax and bracket balance corruption during automated AI-agent refactoring.
+- **Built-in AI MCP Server (39 Tools):** Ready out-of-the-box for AI coding environments (Claude Desktop, Cursor, Antigravity, VS Code, Zed) via `poler mcp`.
+- **Multicall Compatibility:** Direct drop-in replacement for `poler-harvest` and `poler-edit-core` via symlinks or executable names.
+
+---
+
+## 🛠️ CLI Subcommands
+
+### 1. `poler harvest` — High-Speed Project & Disk Harvester
+Extracts relevant snippets, full files, or exact 16-byte anchors across multiple directories:
+```bash
+# Markdown output with sections around matches
+poler harvest /path/to/project "database connection" --format markdown
+
+# JSONL stream of exact byte anchors for agents / editors
+poler harvest /path/to/project "fn main" --format address
+
+# Corpus mode (pure text stripped of headers for model ingestion)
+poler harvest /path/to/docs "architecture" --format corpus -o corpus.txt
+```
+
+### 2. `poler grep` — Parallel Project Grep
+Fast parallel search respecting `.gitignore`:
+```bash
+# Literal search with 2 lines of context
+poler grep "GrepConfig" src/ -C 2
+
+# Case-insensitive regex search
+poler grep "(pub\s+fn\s+\w+)" src/ --regex -i
+
+# JSON output for machine parsing
+poler grep "TODO" . --json
+```
+
+### 3. `poler view` — Instant File & Document Viewer
+Reads any file size without memory bloat, automatically extracting text from `.docx`, `.epub`, `.pdf`:
+```bash
+# View lines 1 to 50 of huge files or logs
+poler view huge_server_log.txt --lines 1..50
+
+# Read text from Word document directly in terminal
+poler view specification.docx
+```
+
+### 4. `poler patch` — In-Place Surgical Text Replacement
+Atomic zero-copy search-and-replace using Piece-Table:
+```bash
+poler patch src/config.rs "debug: false" "debug: true"
+```
+
+### 5. `poler edit` — Headless JSON-RPC Editor Server
+Starts the stdio JSON-RPC interface for editors, IDEs, and automation:
+```bash
+# Inspect complete 71-command JSON schema
+poler edit --schema
+
+# One-shot command execution
+poler edit --exec '{"cmd":"stats","path":"Cargo.toml"}'
+```
+
+### 6. `poler mcp` — Model Context Protocol Server
+Exposes 39 agentic tools over standard input/output:
+```bash
+poler mcp
+```
+
+### 7. `poler schema` — Complete Self-Documenting Manifest
+Outputs machine-readable documentation of all CLI subcommands and capabilities:
+```bash
+poler schema
+```
+
+---
+
+## 🔌 AI Agent Integration (MCP Configuration)
+
+To configure `poler` in Claude Desktop (`claude_desktop_config.json`) or Cursor / Antigravity:
+
+```json
+{
+  "mcpServers": {
+    "poler": {
+      "command": "poler",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+This exposes `poler_harvest`, `poler_grep`, `poler_read_span`, `poler_replace_match`, `poler_piece_diff`, `poler_apply_batch`, `poler_vfs_open`, and 32 other surgical operations.
+
+---
+
+## 📦 Backward Compatibility (Multicall)
+
+`poler` detects its invocation name. You can create symlinks:
+
+```bash
+ln -s ~/.local/bin/poler ~/.local/bin/poler-harvest
+ln -s ~/.local/bin/poler ~/.local/bin/poler-edit-core
+```
+
+- When run as `poler-harvest`, it accepts the original `poler-harvest` CLI options.
+- When run as `poler-edit-core`, it accepts the original JSON-RPC stdio and `--exec` options.
+
+---
+
+## 🧪 Testing & Verification
+
+All 184 unit and integration tests pass cleanly:
+
+```bash
+cargo test
+```
+
+---
+
+## 📄 License
+
+Licensed under the MIT License or Apache-2.0 License.
