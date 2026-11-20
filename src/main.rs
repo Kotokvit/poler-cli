@@ -381,13 +381,40 @@ fn run_grep_cli(args: &[String]) -> ExitCode {
 
 fn run_view_cli(args: &[String]) -> ExitCode {
     if args.is_empty() {
-        eprintln!("Использование: poler view <PATH> [--lines START..END]");
+        eprintln!("Использование: poler view <PATH[::ENTRY]> [--lines START..END]");
         return ExitCode::from(2);
     }
-    let path = PathBuf::from(&args[0]);
+    let target_spec = &args[0];
+    let (path, entry_from_spec) = if let Some((p, e)) = target_spec.split_once("::") {
+        (PathBuf::from(p), Some(e.to_string()))
+    } else {
+        (PathBuf::from(target_spec), None)
+    };
+
     if !path.exists() {
         eprintln!("poler view: файл не найден: {}", path.display());
         return ExitCode::from(2);
+    }
+
+    // Если это VFS-контейнер и указана конкретная запись:
+    if let Some(entry) = entry_from_spec {
+        let norm = poler_cli::core::vfs::norm_name(&entry);
+        match poler_cli::core::vfs::vfs_read(&path, &norm, 4 << 20) {
+            Ok(bytes) => match String::from_utf8(bytes) {
+                Ok(text) => {
+                    print!("{text}");
+                    return ExitCode::SUCCESS;
+                }
+                Err(_) => {
+                    eprintln!("poler view: запись {norm} содержит бинарные данные");
+                    return ExitCode::from(1);
+                }
+            },
+            Err(e) => {
+                eprintln!("poler view: ошибка чтения записи {norm}: {e}");
+                return ExitCode::from(1);
+            }
+        }
     }
 
     // Если это документ (DOCX, EPUB, PDF, MOBI, FB2) — извлекаем чистый текст
@@ -400,6 +427,28 @@ fn run_view_cli(args: &[String]) -> ExitCode {
             Ok(None) => {}
             Err(e) => {
                 eprintln!("poler view: ошибка извлечения: {e}");
+                return ExitCode::from(1);
+            }
+        }
+    }
+
+    // Если это VFS-контейнер (.zip, .tar, .poler и т.д.) без указания записи —
+    // выводим листинг контейнера вместо сырых байтов архива!
+    if poler_cli::core::vfs::is_vfs_container(&path) {
+        match poler_cli::core::vfs::vfs_list(&path) {
+            Ok((kind, entries)) => {
+                println!("{kind:?} контейнер: {} (всего записей: {})", path.display(), entries.len());
+                for e in entries.iter().take(50) {
+                    let d = if e.is_dir { "/" } else { "" };
+                    println!("{:>10}  {}{}", e.size, e.name, d);
+                }
+                if entries.len() > 50 {
+                    println!("... и ещё {} записей (для просмотра записи: poler view {}::<ENTRY>)", entries.len() - 50, path.display());
+                }
+                return ExitCode::SUCCESS;
+            }
+            Err(e) => {
+                eprintln!("poler view: ошибка листинга архива: {e}");
                 return ExitCode::from(1);
             }
         }
@@ -444,35 +493,141 @@ fn run_view_cli(args: &[String]) -> ExitCode {
 
 fn run_patch_cli(args: &[String]) -> ExitCode {
     if args.len() < 3 {
-        eprintln!("Использование: poler patch <PATH> <OLD_TEXT> <NEW_TEXT>");
+        eprintln!("Использование: poler patch <PATH[::ENTRY]> <OLD_TEXT> <NEW_TEXT> [--entry <ENTRY>]");
         return ExitCode::from(2);
     }
-    let path = PathBuf::from(&args[0]);
+    let target_spec = &args[0];
     let old_text = &args[1];
     let new_text = &args[2];
 
-    match poler_cli::core::buffer::PolerBuffer::open(&path) {
-        Ok(mut b) => {
-            match b.replace_match(old_text, new_text, None, None, false, true) {
-                Ok(_) => match b.save() {
-                    Ok(bytes) => {
-                        eprintln!("poler patch: успешно обновлено ({} байт)", bytes);
+    let mut entry_override: Option<String> = None;
+    let mut i = 3;
+    while i < args.len() {
+        if (args[i] == "--entry" || args[i] == "-e") && i + 1 < args.len() {
+            entry_override = Some(args[i + 1].clone());
+            i += 2;
+        } else {
+            i += 1;
+        }
+    }
+
+    let (path, entry_from_spec) = if let Some((p, e)) = target_spec.split_once("::") {
+        (PathBuf::from(p), Some(e.to_string()))
+    } else {
+        (PathBuf::from(target_spec), None)
+    };
+
+    let target_entry = entry_override.or(entry_from_spec);
+
+    if !path.exists() {
+        eprintln!("poler patch: файл не найден: {}", path.display());
+        return ExitCode::from(2);
+    }
+
+    // Если это VFS-контейнер (.zip, .docx, .epub, .odt, .jar, .tar, .poler и т.д.) —
+    // КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО открывать его как сырой буфер (это ломает CRC32 и структуру архива).
+    // Работаем строго через CoW VFS и flush_archive!
+    if poler_cli::core::vfs::is_vfs_container(&path) {
+        let entry_name = match target_entry {
+            Some(e) => poler_cli::core::vfs::norm_name(&e),
+            None => {
+                // Если запись не указана явно — сканируем записи архива на совпадение с old_text
+                match poler_cli::core::vfs::vfs_list(&path) {
+                    Ok((_, entries)) => {
+                        let mut candidates = Vec::new();
+                        for e in entries.iter().filter(|e| !e.is_dir && e.size <= poler_cli::core::vfs::DEFAULT_MAX_ENTRY_BYTES) {
+                            if let Ok(bytes) = poler_cli::core::vfs::vfs_read(&path, &e.name, poler_cli::core::vfs::DEFAULT_MAX_ENTRY_BYTES) {
+                                if let Ok(s) = String::from_utf8(bytes) {
+                                    if s.contains(old_text) {
+                                        candidates.push(e.name.clone());
+                                    }
+                                }
+                            }
+                        }
+                        if candidates.is_empty() {
+                            eprintln!("poler patch: текст {:?} не найден ни в одной записи архива {}", old_text, path.display());
+                            return ExitCode::from(1);
+                        } else if candidates.len() == 1 {
+                            let chosen = candidates.remove(0);
+                            eprintln!("poler patch: обнаружена целевая запись '{}' в архиве {}", chosen, path.display());
+                            chosen
+                        } else {
+                            eprintln!("poler patch: текст найден в нескольких записях: {:?}. Укажите конкретную запись: poler patch {}::<ENTRY> {:?} {:?}", candidates, path.display(), old_text, new_text);
+                            return ExitCode::from(1);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("poler patch: ошибка чтения контейнера {}: {e}", path.display());
+                        return ExitCode::from(1);
+                    }
+                }
+            }
+        };
+
+        // Читаем запись через vfs_read
+        let bytes = match poler_cli::core::vfs::vfs_read(&path, &entry_name, poler_cli::core::vfs::DEFAULT_MAX_ENTRY_BYTES) {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("poler patch: ошибка чтения записи {entry_name}: {e}");
+                return ExitCode::from(1);
+            }
+        };
+
+        let text = match String::from_utf8(bytes) {
+            Ok(t) => t,
+            Err(_) => {
+                eprintln!("poler patch: запись {entry_name} содержит бинарные данные, текстовая правка невозможна");
+                return ExitCode::from(1);
+            }
+        };
+
+        let virtual_path = PathBuf::from(format!("vfs://{}::{}", path.display(), entry_name));
+        let mut buf = poler_cli::core::buffer::PolerBuffer::from_text(virtual_path, &text);
+        match buf.replace_match(old_text, new_text, None, None, false, true) {
+            Ok(_) => {
+                let new_bytes = buf.read_range(0, buf.total_len() as usize);
+                let mut ov = poler_cli::core::vfs_edit::VfsOverlay::default();
+                ov.write(&entry_name, new_bytes);
+                match poler_cli::core::vfs_edit::flush_archive(&path, &ov, &path, poler_cli::core::vfs_edit::DEFAULT_MAX_WRITE_BYTES) {
+                    Ok(stats) => {
+                        eprintln!("poler patch: успешно обновлена запись '{}' в архиве ({} байт)", entry_name, stats.bytes);
                         ExitCode::SUCCESS
                     }
                     Err(e) => {
-                        eprintln!("poler patch: ошибка сохранения: {e}");
+                        eprintln!("poler patch: ошибка пересборки архива: {e}");
                         ExitCode::from(1)
                     }
-                },
-                Err(e) => {
-                    eprintln!("poler patch: замена не удалась: {e}");
-                    ExitCode::from(1)
                 }
             }
+            Err(e) => {
+                eprintln!("poler patch: замена не удалась: {e}");
+                ExitCode::from(1)
+            }
         }
-        Err(e) => {
-            eprintln!("poler patch: ошибка открытия файла: {e}");
-            ExitCode::from(1)
+    } else {
+        match poler_cli::core::buffer::PolerBuffer::open(&path) {
+            Ok(mut b) => {
+                match b.replace_match(old_text, new_text, None, None, false, true) {
+                    Ok(_) => match b.save() {
+                        Ok(bytes) => {
+                            eprintln!("poler patch: успешно обновлено ({} байт)", bytes);
+                            ExitCode::SUCCESS
+                        }
+                        Err(e) => {
+                            eprintln!("poler patch: ошибка сохранения: {e}");
+                            ExitCode::from(1)
+                        }
+                    },
+                    Err(e) => {
+                        eprintln!("poler patch: замена не удалась: {e}");
+                        ExitCode::from(1)
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("poler patch: ошибка открытия файла: {e}");
+                ExitCode::from(1)
+            }
         }
     }
 }
