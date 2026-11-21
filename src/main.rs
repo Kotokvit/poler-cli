@@ -166,6 +166,7 @@ fn print_help() {
          CORE COMMANDS:\n  \
            poler harvest <ROOT> \"<QUERY>\" [flags]   Full-disk harvest with L1-L3 cache (.t5a) & ANSI highlighting\n  \
            poler grep \"<PATTERN>\" [PATH] [flags]    Streaming project grep with .gitignore awareness\n  \
+           poler scan <PATH> -q \"<QUERY>\" [flags]   Topographic resonance search: full scenes, eps-density, R(t), K-hop graph (ai-json|md|simple)\n  \
            poler edit [PATH]                       Launch stdio JSON-RPC editor core for IDEs and agents\n  \
            poler view <PATH> [--lines A..B] [--json] Instant viewer for text, 40GB logs, DOCX, EPUB, PDF\n  \
            poler patch <PATH> <OLD> <NEW> [flags]  Atomic surgical replacement (--dry-run, --diff, --json, --entry)\n  \
@@ -215,6 +216,7 @@ fn print_schema() {
         "subcommands": {
             "harvest": "Полнодисковый сбор файлов и кода с L1-L3 адресацией (.t5a)",
             "grep": "Параллельный потоковый grep по кодовой базе с учётом .gitignore",
+            "scan": "Топографический резонансный поиск (порт poler-engine): полные сцены, ε-плотность, R(t), K-hop граф, intent код↔проза; --format ai-json|md|simple, --resonance-mode hits|field|psi|poler",
             "edit": "Zero-Copy Piece-Table редакторский сервер (stdio JSON-RPC)",
             "view": "Быстрый просмотр любых файлов (включая 40 ГБ логи, DOCX, EPUB, PDF)",
             "patch": "Точечная атомарная замена подстроки в файле или внутри архива",
@@ -404,6 +406,228 @@ fn run_grep_cli(args: &[String]) -> ExitCode {
             eprintln!("poler grep: error: {e}");
             ExitCode::from(2)
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// poler scan — топографический резонансный ε-поиск (порт CLI-поверхности
+// poler-engine): полные сцены/функции вместо обрывков строк, метрики
+// плотности ε, резонанса R(t), K-hop связи и intent-ранжирование.
+// ---------------------------------------------------------------------------
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+enum ScanFormat {
+    /// Самодостаточные Context Anchors (контракт для ИИ-агента).
+    AiJson,
+    /// Человекочитаемый Markdown.
+    Md,
+    /// Компактный однострочный список.
+    Simple,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+enum ScanResonance {
+    Hits,
+    Field,
+    Psi,
+    Poler,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+enum ScanIntent {
+    Auto,
+    Code,
+    Prose,
+    Off,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
+enum ScanPii {
+    Off,
+    Mask,
+    Redact,
+}
+
+#[derive(Parser, Debug)]
+#[command(
+    name = "poler scan",
+    about = "Topographic resonance search: full scenes instead of line scraps, epsilon density, R(t), K-hop relations"
+)]
+struct ScanCli {
+    /// Корень сканирования (файл или каталог).
+    #[arg(value_name = "PATH")]
+    path: PathBuf,
+
+    /// Поисковый запрос (токены; синтаксис кода → приоритет кода).
+    #[arg(short = 'q', long = "query")]
+    query: String,
+
+    #[arg(long, value_enum, default_value_t = ScanFormat::AiJson)]
+    format: ScanFormat,
+
+    /// Режим накопления резонанса.
+    #[arg(long = "resonance-mode", value_enum, default_value_t = ScanResonance::Hits)]
+    resonance: ScanResonance,
+
+    /// Intent-ранжирование код ↔ проза.
+    #[arg(long, value_enum, default_value_t = ScanIntent::Auto)]
+    intent: ScanIntent,
+
+    /// Режим очистки PII.
+    #[arg(long, value_enum, default_value_t = ScanPii::Mask)]
+    pii: ScanPii,
+
+    /// Число возвращаемых якорей.
+    #[arg(long = "top-n", default_value_t = 10)]
+    top_n: usize,
+
+    /// Радиус окна в токенах (полуокно).
+    #[arg(long = "window", default_value_t = 40)]
+    window_radius: usize,
+
+    /// Глубина K-hop обхода графа.
+    #[arg(short = 'k', long = "k-hop", default_value_t = 2)]
+    k_hop: usize,
+
+    /// Расширения файлов (comma-separated; по умолчанию — DEFAULT_EXTENSIONS).
+    #[arg(long)]
+    extensions: Option<String>,
+
+    /// Показывать скрытые файлы.
+    #[arg(long, default_value_t = false)]
+    hidden: bool,
+
+    /// Максимум K-hop отношений на якорь.
+    #[arg(long = "max-relations", default_value_t = 64)]
+    max_relations: usize,
+
+    /// Бюджет рёбер графа сущностей.
+    #[arg(long = "max-graph-triples", default_value_t = 200_000)]
+    max_graph_triples: usize,
+
+    /// POLER[Ψ]: η — скорость обучения внимания.
+    #[arg(long = "psi-eta", default_value_t = 0.05)]
+    psi_eta: f64,
+    /// POLER[Ψ]: γ — вес резонансного члена.
+    #[arg(long = "psi-gamma", default_value_t = 0.5)]
+    psi_gamma: f64,
+    /// POLER[Ψ]: ρ — затухание резонансной памяти.
+    #[arg(long = "psi-rho", default_value_t = 0.9)]
+    psi_rho: f64,
+    /// POLER[Ψ]: K — глубина резонансной памяти.
+    #[arg(long = "psi-depth", default_value_t = 8)]
+    psi_depth: usize,
+
+    /// POLER-цикл (P3): η.
+    #[arg(long = "poler-eta", default_value_t = 0.01)]
+    poler_eta: f64,
+    /// POLER-цикл: γ.
+    #[arg(long = "poler-gamma", default_value_t = 0.1)]
+    poler_gamma: f64,
+    /// POLER-цикл: mix (CORDIC-нормализация).
+    #[arg(long = "poler-mix", default_value_t = 0.1)]
+    poler_mix: f64,
+
+    /// Подробная статистика в stderr.
+    #[arg(short = 'v', long)]
+    verbose: bool,
+}
+
+fn run_scan_cli(args: &[String]) -> ExitCode {
+    use poler_cli::engine::Engine;
+    use poler_cli::{render_markdown, render_simple, EngineConfig, PiiMode, ResonanceMode};
+
+    let cli = match ScanCli::try_parse_from(
+        std::iter::once("poler scan".to_string()).chain(args.iter().cloned()),
+    ) {
+        Ok(c) => c,
+        Err(e) => {
+            eprint!("{e}");
+            return ExitCode::from(2);
+        }
+    };
+
+    if !cli.path.exists() {
+        eprintln!("poler scan: путь не найден: {}", cli.path.display());
+        return ExitCode::from(2);
+    }
+
+    let config = EngineConfig {
+        window_radius: cli.window_radius,
+        top_n: cli.top_n,
+        k_hop_depth: cli.k_hop,
+        pii_mode: match cli.pii {
+            ScanPii::Off => PiiMode::Off,
+            ScanPii::Mask | ScanPii::Redact => PiiMode::Mask,
+        },
+        resonance_mode: match cli.resonance {
+            ScanResonance::Hits => ResonanceMode::Hits,
+            ScanResonance::Field => ResonanceMode::Field,
+            ScanResonance::Psi => ResonanceMode::Psi,
+            ScanResonance::Poler => ResonanceMode::Poler,
+        },
+        extensions: match &cli.extensions {
+            Some(list) => list
+                .split(',')
+                .map(|s| s.trim().to_lowercase())
+                .filter(|s| !s.is_empty())
+                .collect(),
+            None => poler_cli::EngineConfig::default().extensions,
+        },
+        include_hidden: cli.hidden,
+        max_relations: cli.max_relations,
+        max_graph_triples: cli.max_graph_triples,
+        psi_params: poler_cli::psi::PsiParams {
+            eta: cli.psi_eta,
+            gamma: cli.psi_gamma,
+            rho: cli.psi_rho,
+            memory_depth: cli.psi_depth,
+        },
+        poler_params: poler_cli::poler::PolerParams {
+            eta: cli.poler_eta,
+            gamma: cli.poler_gamma,
+            mix: cli.poler_mix,
+            ..poler_cli::poler::PolerParams::default()
+        },
+        intent_mode: match cli.intent {
+            ScanIntent::Auto => poler_cli::intent::IntentMode::Auto,
+            ScanIntent::Code => poler_cli::intent::IntentMode::Code,
+            ScanIntent::Prose => poler_cli::intent::IntentMode::Prose,
+            ScanIntent::Off => poler_cli::intent::IntentMode::Off,
+        },
+        ..EngineConfig::default()
+    };
+
+    let mut engine = Engine::new(config, false);
+    let (result, stats) = engine.scan(&cli.path, &cli.query);
+
+    if cli.verbose {
+        eprintln!(
+            "poler scan: файлов={}, с совпадениями={}, токенов={}, хитов={}, узлов графа={}, рёбер={}, время={}мс",
+            stats.files_scanned,
+            stats.files_with_hits,
+            stats.total_tokens,
+            stats.total_hits,
+            stats.graph_nodes,
+            stats.graph_edges,
+            stats.elapsed_ms
+        );
+    }
+
+    match cli.format {
+        ScanFormat::AiJson => {
+            println!("{}", serde_json::to_string_pretty(&result).unwrap_or_default());
+        }
+        ScanFormat::Md => print!("{}", render_markdown(&result)),
+        ScanFormat::Simple => print!("{}", render_simple(&result)),
+    }
+    use std::io::Write;
+    let _ = std::io::stdout().flush();
+
+    if result.total_hits == 0 {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
     }
 }
 
@@ -942,6 +1166,7 @@ fn main() -> ExitCode {
     match cmd {
         "harvest" => run_harvest_cli(&args[2..]),
         "grep" => run_grep_cli(&args[2..]),
+        "scan" => run_scan_cli(&args[2..]),
         "edit" => run_edit_cli(&args[2..]),
         "view" => run_view_cli(&args[2..]),
         "patch" => run_patch_cli(&args[2..]),

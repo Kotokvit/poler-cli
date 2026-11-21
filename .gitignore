@@ -4,3 +4,7 @@ target/
 *.bak
 .DS_Store
 /core
+
+# FlyWire v783 golden-артефакты (42 MB): копируются из poler-engine
+# docs/flywire-connectome/ при локальном прогоне connectome-тестов
+docs/flywire-connectome/
