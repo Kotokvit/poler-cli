@@ -9,7 +9,7 @@ use serde_json::json;
 use poler_cli::harvest::{
     run_harvest, ColorChoice, HarvestConfig, HarvestFormat, HarvestMode,
 };
-use poler_cli::grep::{
+use poler_cli::retrieval::grep::{
     grep_run, render_text, GrepConfig, GrepMode, GrepOutput,
 };
 
@@ -136,7 +136,22 @@ struct GrepCli {
     #[arg(long = "no-ignore")]
     no_ignore: bool,
 
-    #[arg(long = "max-results", default_value_t = 50_000)]
+    /// Скан архивов без распаковки: zip/tar/tar.gz/tar.zst/gz/zst
+    /// раскрываются виртуальными файлами «архив::запись».
+    #[arg(long = "archives")]
+    archives: bool,
+
+    /// Пароль зашифрованных zip-записей (ZipCrypto/AES).
+    /// Резолв: --archive-password → POLER_ARCHIVE_KEY.
+    #[arg(long = "archive-password")]
+    archive_password: Option<String>,
+
+    /// Останов после N совпавших строк на файл (grep -m).
+    /// Жук №1 полевого заезда: прежний дефолт 50 000 молча обрезал
+    /// большие логи (375k совпадений → 50k, rc=0). Дефолт поднят до
+    /// 1 000 000; при фактической обрезке печатается предупреждение
+    /// в stderr и выставляется stats.truncated в --json.
+    #[arg(long = "max-results", default_value_t = 1_000_000)]
     max_results: usize,
 
     #[arg(long = "json")]
@@ -355,11 +370,24 @@ fn run_grep_cli(args: &[String]) -> ExitCode {
         respect_ignore: !cli.no_ignore,
         output,
         max_count: if cli.max_results > 0 { Some(cli.max_results) } else { None },
+        scan_archives: cli.archives,
+        // Резолв пароля архивов: флаг → POLER_ARCHIVE_KEY (как в poler-engine).
+        archive_password: cli
+            .archive_password
+            .or_else(|| std::env::var("POLER_ARCHIVE_KEY").ok()),
         ..Default::default()
     };
 
     match grep_run(&roots, &cfg) {
         Ok(rep) => {
+            // Жук №1: обрезка по -m/max-results больше не молчит.
+            if rep.stats.truncated {
+                eprintln!(
+                    "poler grep: warning: вывод обрезан по --max-results {} (файлов доиграно до лимита: {}; поднимите --max-results или снимите лимит --max-results 0)",
+                    cli.max_results,
+                    rep.stats.files_truncated
+                );
+            }
             if cli.json {
                 println!("{}", serde_json::to_string_pretty(&rep).unwrap());
             } else {

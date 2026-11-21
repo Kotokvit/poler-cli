@@ -168,16 +168,16 @@ impl McpServer {
                 });
             let pattern = args.get("pattern").and_then(|x| x.as_str()).unwrap_or("").to_string();
             let mode = if args.get("mode").and_then(|x| x.as_str()) == Some("regex") {
-                crate::grep::GrepMode::Regex
+                crate::retrieval::grep::GrepMode::Regex
             } else {
-                crate::grep::GrepMode::Literal
+                crate::retrieval::grep::GrepMode::Literal
             };
             let case_insensitive = args.get("case_insensitive").and_then(|x| x.as_bool()).unwrap_or(false);
             let before = args.get("context_before").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
             let after = args.get("context_after").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
             let max_count = args.get("max_count").and_then(|x| x.as_u64()).map(|n| n as usize);
 
-            let cfg = crate::grep::GrepConfig {
+            let cfg = crate::retrieval::grep::GrepConfig {
                 pattern,
                 mode,
                 case_insensitive,
@@ -186,9 +186,9 @@ impl McpServer {
                 max_count,
                 ..Default::default()
             };
-            return match crate::grep::grep_run(&roots, &cfg) {
+            return match crate::retrieval::grep::grep_run(&roots, &cfg) {
                 Ok(rep) => {
-                    let text = crate::grep::render_text(&rep, false);
+                    let text = crate::retrieval::grep::render_text(&rep, false);
                     tool_result(json!({
                         "lines_matched": rep.stats.lines_matched,
                         "files_matched": rep.stats.files_matched,
