@@ -252,7 +252,7 @@ impl CoreSession {
                 .docs
                 .map
                 .get(&doc)
-                .ok_or_else(|| format!("doc_not_found: нет открытого документа doc={doc}"))?;
+                .ok_or_else(|| format!("doc_not_found: no open document doc={doc}"))?;
             (b.rev(), b.snapshot())
         };
         if let Some((cd, cr, prof, peaks)) = self.energy_cache.lock().unwrap().clone() {
@@ -287,7 +287,7 @@ impl CoreSession {
             if self.docs.map.contains_key(&explicit) {
                 return Ok(explicit);
             }
-            return Err(format!("doc_not_found: нет открытого документа doc={explicit}"));
+            return Err(format!("doc_not_found: no open document doc={explicit}"));
         }
         if let Some(p) = req_path(v) {
             if !p.as_os_str().is_empty() {
@@ -521,13 +521,13 @@ impl CoreSession {
 
             "insert_at" => {
                 let Some(text) = v.get("text").and_then(|x| x.as_str()) else {
-                    return Some(json!({"id": id, "ok": false, "error": "insert_at: поле text обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "insert_at: text field is required"}));
                 };
                 if text.len() > MAX_EDIT_PAYLOAD_BYTES {
                     return Some(json!({
                         "id": id,
                         "ok": false,
-                        "error": format!("payload_too_large: длина text ({}) превышает лимит {} байт", text.len(), MAX_EDIT_PAYLOAD_BYTES)
+                        "error": format!("payload_too_large: text length ({}) exceeds limit {} bytes", text.len(), MAX_EDIT_PAYLOAD_BYTES)
                     }));
                 }
                 match self.resolve_or_open_doc(v) {
@@ -580,7 +580,7 @@ impl CoreSession {
             // дописывает чанк токенов/текста в конец Piece-Table буфера с CAS-защитой
             "append" | "stream" => {
                 let Some(text) = v.get("text").and_then(|x| x.as_str()) else {
-                    return Some(json!({"id": id, "ok": false, "error": "append: поле text обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "append: text field is required"}));
                 };
                 match self.resolve_or_open_doc(v) {
                     Ok(doc) => {
@@ -646,10 +646,10 @@ impl CoreSession {
 
             "replace_match" => {
                 let Some(old_text) = v.get("old_text").and_then(|x| x.as_str()) else {
-                    return Some(json!({"id": id, "ok": false, "error": "replace_match: поле old_text обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "replace_match: old_text field is required"}));
                 };
                 let Some(new_text) = v.get("new_text").and_then(|x| x.as_str()) else {
-                    return Some(json!({"id": id, "ok": false, "error": "replace_match: поле new_text обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "replace_match: new_text field is required"}));
                 };
                 let near_line = v.get("near_line").and_then(|x| x.as_u64());
                 let occurrence = v.get("occurrence").and_then(|x| x.as_u64()).map(|n| n as usize);
@@ -702,7 +702,7 @@ impl CoreSession {
 
             "apply_batch" => {
                 let Some(ops_val) = v.get("ops") else {
-                    return Some(json!({"id": id, "ok": false, "error": "apply_batch: поле ops обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "apply_batch: ops field is required"}));
                 };
                 let ops: Vec<BatchEditOp> = match serde_json::from_value(ops_val.clone()) {
                     Ok(o) => o,
@@ -751,7 +751,7 @@ impl CoreSession {
 
             "apply_diff" => {
                 let Some(diff_text) = v.get("diff").and_then(|x| x.as_str()) else {
-                    return Some(json!({"id": id, "ok": false, "error": "apply_diff: поле diff обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "apply_diff: diff field is required"}));
                 };
                 let fuzz = v.get("fuzz").and_then(|x| x.as_u64()).unwrap_or(3) as usize;
                 let check_syntax = v.get("check_syntax").and_then(|x| x.as_bool()).unwrap_or(false);
@@ -848,13 +848,13 @@ impl CoreSession {
                 ) else {
                     return Some(json!({
                         "id": id, "ok": false,
-                        "error": "doc_not_found: укажите существующие base_doc, ours_doc, theirs_doc"
+                        "error": "doc_not_found: specify existing base_doc, ours_doc, theirs_doc"
                     }));
                 };
 
                 if let Some(tid) = target_id {
                     let Some(tb) = self.docs.map.get(&tid) else {
-                        return Some(json!({"id": id, "ok": false, "error": "target_doc не найден"}));
+                        return Some(json!({"id": id, "ok": false, "error": "target_doc not found"}));
                     };
                     if let Some(cas_err) = check_cas(id, v, tb) {
                         return Some(cas_err);
@@ -949,7 +949,7 @@ impl CoreSession {
 
             "project_impact" => {
                 let Some(symbol) = v.get("symbol").and_then(|x| x.as_str()) else {
-                    return Some(json!({"id": id, "ok": false, "error": "project_impact: поле symbol обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "project_impact: symbol field is required"}));
                 };
                 let root = req_root(v);
                 let refresh = v.get("refresh").and_then(|x| x.as_bool()).unwrap_or(false);
@@ -983,7 +983,7 @@ impl CoreSession {
 
             "pdf_replace" => {
                 let Some(p) = req_path(v) else {
-                    return Some(json!({"id": id, "ok": false, "error": "pdf_replace: поле path обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "pdf_replace: path field is required"}));
                 };
                 let search = v.get("search").and_then(|x| x.as_str()).unwrap_or("");
                 let replace = v.get("replace").and_then(|x| x.as_str()).unwrap_or("");
@@ -999,7 +999,7 @@ impl CoreSession {
 
             "pdf_save" => {
                 let Some(p) = req_path(v) else {
-                    return Some(json!({"id": id, "ok": false, "error": "pdf_save: поле path обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "pdf_save: path field is required"}));
                 };
                 let text = v.get("text").and_then(|x| x.as_str()).unwrap_or("");
                 match crate::pdf_edit::save_pdf_buffer(&p, text) {
@@ -1010,7 +1010,7 @@ impl CoreSession {
 
             "extract_doc" => {
                 let Some(p) = req_path(v) else {
-                    return Some(json!({"id": id, "ok": false, "error": "extract_doc: поле path обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "extract_doc: path field is required"}));
                 };
                 let max_chars = v
                     .get("max_chars")
@@ -1098,7 +1098,7 @@ impl CoreSession {
                     }
                 }
                 let Some(p) = req_path(v) else {
-                    return Some(json!({"id": id, "ok": false, "error": "vfs_list: поле path обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "vfs_list: path field is required"}));
                 };
                 // Фаза 3: листинг с учётом CoW-оверлея (статусы
                 // ok/modified/added, удалённые скрыты, новые дописаны).
@@ -1134,7 +1134,7 @@ impl CoreSession {
                             .unwrap_or_default();
                         if name.is_empty() {
                             return Some(json!({"id": id, "ok": false,
-                                "error": "vfs_read: для полигона vfs://ai_scratch/ укажите имя записи в path или entry"}));
+                                "error": "vfs_read: for scratchpad vfs://ai_scratch/ specify entry name in path or entry"}));
                         }
                         return Some(match self.scratch.get(&name) {
                             Ok(bytes)
@@ -1156,10 +1156,10 @@ impl CoreSession {
                     }
                 }
                 let Some(p) = req_path(v) else {
-                    return Some(json!({"id": id, "ok": false, "error": "vfs_read: поле path обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "vfs_read: path field is required"}));
                 };
                 let Some(entry) = v.get("entry").and_then(|x| x.as_str()) else {
-                    return Some(json!({"id": id, "ok": false, "error": "vfs_read: поле entry обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "vfs_read: entry field is required"}));
                 };
                 let as_text = v.get("text").and_then(|x| x.as_bool()).unwrap_or(false);
                 // Лимит записи (защита от zip-бомб): по умолчанию 64 МиБ,
@@ -1204,10 +1204,10 @@ impl CoreSession {
                 // получает виртуальный путь vfs://<архив>::<запись>, правки
                 // живут в piece-table, а Ctrl+S (vfs_save) уходит в оверлей.
                 let Some(p) = req_path(v) else {
-                    return Some(json!({"id": id, "ok": false, "error": "vfs_open: поле path обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "vfs_open: path field is required"}));
                 };
                 let Some(entry) = v.get("entry").and_then(|x| x.as_str()) else {
-                    return Some(json!({"id": id, "ok": false, "error": "vfs_open: поле entry обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "vfs_open: entry field is required"}));
                 };
                 let norm = crate::vfs::norm_name(entry);
                 // Повторное открытие уже открытой записи — тот же doc
@@ -1265,15 +1265,15 @@ impl CoreSession {
                 let doc = doc_of(v);
                 let Some((archive, entry)) = self.vfs_docs.get(&doc).cloned() else {
                     return Some(json!({"id": id, "ok": false, "error":
-                        format!("vfs_save: doc={doc} не є VFS-вкладкою (відкрийте запис через vfs_open)")}));
+                        format!("vfs_save: doc={doc} is not a VFS tab (open entry via vfs_open)")}));
                 };
                 let Some(b) = self.docs.map.get_mut(&doc) else {
-                    return Some(json!({"id": id, "ok": false, "error": "vfs_save: нет такого doc"}));
+                    return Some(json!({"id": id, "ok": false, "error": "vfs_save: no such doc"}));
                 };
                 let len = b.total_len();
                 if len > crate::vfs_edit::DEFAULT_MAX_WRITE_BYTES {
                     return Some(json!({"id": id, "ok": false, "error":
-                        format!("vfs_save: документ {len} байт > ліміту {} байт", crate::vfs_edit::DEFAULT_MAX_WRITE_BYTES)}));
+                        format!("vfs_save: document {len} bytes > limit {} bytes", crate::vfs_edit::DEFAULT_MAX_WRITE_BYTES)}));
                 }
                 let bytes = b.read_range(0, len as usize);
                 let key = normalize_path_key(&archive);
@@ -1292,10 +1292,10 @@ impl CoreSession {
             "vfs_write" => {
                 // Прямая запись в оверлей (GUI/агенты): data_base64 или text.
                 let Some(p) = req_path(v) else {
-                    return Some(json!({"id": id, "ok": false, "error": "vfs_write: поле path обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "vfs_write: path field is required"}));
                 };
                 let Some(entry) = v.get("entry").and_then(|x| x.as_str()) else {
-                    return Some(json!({"id": id, "ok": false, "error": "vfs_write: поле entry обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "vfs_write: entry field is required"}));
                 };
                 let bytes: Vec<u8> = if let Some(b64) = v.get("data_base64").and_then(|x| x.as_str()) {
                     match crate::vfs::base64_decode(b64) {
@@ -1309,7 +1309,7 @@ impl CoreSession {
                     text.as_bytes().to_vec()
                 } else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "vfs_write: нужно поле data_base64 или text"}));
+                        "error": "vfs_write: data_base64 or text field required"}));
                 };
                 let n = bytes.len();
                 if n as u64 > crate::vfs_edit::DEFAULT_MAX_WRITE_BYTES {
@@ -1381,7 +1381,7 @@ impl CoreSession {
                 // с дотисканием; пустой CoW-оверлей в этом режиме допустим —
                 // это конверсия/перенос записей, а не материализация правок).
                 let Some(p) = req_path(v) else {
-                    return Some(json!({"id": id, "ok": false, "error": "vfs_flush: поле path обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "vfs_flush: path field is required"}));
                 };
                 let to = v
                     .get("to")
@@ -1394,7 +1394,7 @@ impl CoreSession {
                     Some("symbol") => crate::vfs_edit::PolerCompress::Symbol,
                     Some(other) => {
                         return Some(json!({"id": id, "ok": false,
-                            "error": format!("vfs_flush: method повинен бути \"zstd\" або \"symbol\", отримано {other:?}")}))
+                            "error": format!("vfs_flush: method must be \"zstd\" or \"symbol\", got {other:?}")}))
                     }
                 };
                 let force_kind = match v.get("format").and_then(|x| x.as_str()) {
@@ -1402,14 +1402,14 @@ impl CoreSession {
                     Some("poler") => Some(crate::vfs::VfsKind::Poler),
                     Some(other) => {
                         return Some(json!({"id": id, "ok": false,
-                            "error": format!("vfs_flush: невідомий формат {other:?} (підтримується лише \"poler\")")}))
+                            "error": format!("vfs_flush: unknown format {other:?} (only \"poler\" is supported)")}))
                     }
                 };
                 let key = normalize_path_key(&p);
                 let empty = self.vfs_overlays.get(&key).map(|ov| ov.is_empty()).unwrap_or(true);
                 if empty && force_kind.is_none() {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "vfs_flush: у архіву немає змін (CoW-оверлей порожній)"}));
+                        "error": "vfs_flush: archive has no changes (CoW overlay is empty)"}));
                 }
                 // Пустой локальный оверлей для режима ремукса (формат принуждён,
                 // правок может не быть — переносим всё как есть).
@@ -1852,8 +1852,8 @@ impl CoreSession {
                         Some(&i) => i,
                         None => {
                             return Some(json!({"id": id, "ok": false,
-                                "error": format!("crystal_assoc: слова {word:?} нет в кристалле"),
-                                "hint": "сначала прошейте его заметкой crystal_note"}))
+                                "error": format!("crystal_assoc: word {word:?} not found in crystal"),
+                                "hint": "index it first via crystal_note"}))
                         }
                     },
                 };
@@ -2695,7 +2695,7 @@ impl CoreSession {
                         let rev = self.docs.map.get(&doc).map(|b| b.rev()).unwrap_or(0);
                         return Some(json!({
                             "id": id, "ok": false, "doc": doc, "rev": rev,
-                            "error": "save: это VFS-буфер внутри контейнера; используйте vfs_save + vfs_flush"
+                            "error": "save: this is a VFS buffer inside a container; use vfs_save + vfs_flush"
                         }));
                     }
                     let force = v.get("force").and_then(|x| x.as_bool()).unwrap_or(false);
@@ -2707,7 +2707,7 @@ impl CoreSession {
                     if !is_pdf && !force && crate::extractor::is_extractable_format(b.path()) {
                         return Some(json!({
                             "id": id, "ok": false, "doc": doc, "rev": b.rev(),
-                            "error": "save заблокирован: документ извлечён из бинарного контейнера (DOCX/EPUB/ODT/FB2) только для чтения; для правки без разрушения архива используйте vfs_open -> vfs_save -> vfs_flush (или save_as в текстовый файл)"
+                            "error": "save blocked: document extracted from binary container (DOCX/EPUB/ODT/FB2) in read-only mode; for in-place archive editing use vfs_open -> vfs_save -> vfs_flush (or save_as to text file)"
                         }));
                     }
                     if is_pdf {
@@ -2827,7 +2827,7 @@ impl CoreSession {
                     if !conflicts.is_empty() {
                         return Some(json!({
                             "id": id, "ok": false,
-                            "error": "disk_conflict: один или несколько файлов изменены внешне (ни один файл не перезаписан)",
+                            "error": "disk_conflict: one or more files modified externally (no files overwritten)",
                             "conflicts": conflicts,
                         }));
                     }
@@ -2978,7 +2978,7 @@ impl CoreSession {
                 let agents = self.agent_hub.as_ref().map(|h| h.count()).unwrap_or(0);
                 json!({"id": id, "ok": true, "agents": agents})
             }
-            other => json!({"id": id, "ok": false, "error": format!("неизвестная команда: {other}")}),
+            other => json!({"id": id, "ok": false, "error": format!("unknown command: {other}")}),
         };
 
         Some(resp)
@@ -2997,7 +2997,7 @@ fn check_cas(id: u64, v: &Value, b: &PolerBuffer) -> Option<Value> {
             return Some(json!({
                 "id": id,
                 "ok": false,
-                "error": format!("stale_revision: expected_rev={exp}, но текущая ревизия буфера rev={}", b.rev()),
+                "error": format!("stale_revision: expected_rev={exp}, but current buffer rev={}", b.rev()),
                 "current_rev": b.rev(),
                 "expected_rev": exp,
             }));
@@ -3791,7 +3791,7 @@ mod tests {
             .execute(&json!({"id": 2, "cmd": "vfs_flush", "path": p, "format": "rar"}), false, None)
             .unwrap();
         assert_eq!(r0b["ok"], false);
-        assert!(r0b["error"].as_str().unwrap().contains("ормат"));
+        assert!(r0b["error"].as_str().unwrap().to_lowercase().contains("format"));
 
         // 3) Правка через оверлей + flush с method=symbol на месте.
         sess.execute(
@@ -4111,8 +4111,8 @@ mod tests {
             .execute(&json!({"id": 4, "cmd": "crystal_assoc", "word": "ъъъъъ"}), false, None)
             .unwrap();
         assert_eq!(r3["ok"], false);
-        assert!(r3["error"].as_str().unwrap().contains("кристалле"));
-        assert_eq!(r3["hint"], "сначала прошейте его заметкой crystal_note");
+        assert!(r3["error"].as_str().unwrap().contains("crystal"));
+        assert!(r3["hint"].as_str().unwrap().contains("crystal_note"));
 
         // 5) Пустая заметка — вежливая ошибка.
         let r3b = sess

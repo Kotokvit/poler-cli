@@ -80,7 +80,7 @@ impl McpServer {
                             "name": "poler-edit-core",
                             "version": env!("CARGO_PKG_VERSION")
                         },
-                        "instructions": "Суверенное ядро POLER Edit (Zero-Copy Piece-Table + Trit-Silicon 𝕋={-1,0,+1}, барьер скобок 𝕋=0, O(pieces) diff, pack5 CSR Call-Graph 0.2 B/edge). Виртуальные глаза ИИ: poler_saccade (ε_high — карта документа за 1 шаг) → poler_scroll (ε_low — фовеальное окно с удержанием курсора) → poler_seek_energy (прыжок к пику ε). Для правок: poler_replace_match / poler_apply_batch с check_syntax=true. poler_search с rank_by=\"epsilon\" и min_epsilon экономит ~90% токенов; poler_project_impact — перед изменением публичных сигнатур. Фаза 5+ — ЖИВОЙ движок poler-engine как сетевой гейт: poler_engine_status (демон/версия), poler_engine_search / poler_engine_grep (ε-сцены и полный grep по репозиторию через демона), poler_engine_pack / poler_engine_squeeze (дотискание форматов TAR/GZ/ZST в .poler — закон семантики), poler_engine_archive_ls (любой архив без распаковки), poler_engine_impact (AIDDE call-graph), poler_engine_crystal_ingest (корпус → Кристалл .t5c)."
+                        "instructions": "Sovereign POLER Edit Engine (Zero-Copy Piece-Table + Trit-Silicon 𝕋={-1,0,+1}, bracket barrier 𝕋=0, O(pieces) diff, pack5 CSR Call-Graph 0.2 B/edge). Virtual AI Eyes: poler_saccade (ε_high — full document landscape in 1 step) → poler_scroll (ε_low — foveal reading window with cursor anchor) → poler_seek_energy (jump to semantic peak). For editing: poler_replace_match / poler_apply_batch with check_syntax=true. poler_search with rank_by=\"epsilon\" and min_epsilon saves ~90% tokens; poler_project_impact — verify callers before modifying public signatures. Live Engine Gate: poler_engine_status (daemon/version), poler_engine_search / poler_engine_grep (ε-scenes and complete repo grep), poler_engine_pack / poler_engine_squeeze (stream container compression into .poler), poler_engine_archive_ls (in-place archive inspection), poler_engine_impact (AIDDE call-graph), poler_engine_crystal_ingest (corpus → Address Crystal .t5c)."
                     }),
                 ))
             }
@@ -590,27 +590,27 @@ fn mcp_tools_catalog() -> Vec<Value> {
     vec![
         json!({
             "name": "poler_harvest",
-            "description": "Полнодисковый сверхскоростной сбор файлов и поиск фрагментов кода с L1-L3 кэшем адресов (.t5a). Возвращает структурированные секции совпадений с номерами строк и байтовыми смещениями.",
+            "description": "Full-disk ultra-fast harvest and code fragment search with L1-L3 address cache (.t5a). Returns structured match sections with line numbers and byte offsets.",
             "inputSchema": {
                 "type": "object",
                 "required": ["roots", "query"],
                 "properties": {
-                    "roots": { "type": "array", "items": { "type": "string" }, "description": "Корневые каталоги для сканирования" },
-                    "query": { "type": "string", "description": "Поисковый запрос / подстрока" },
+                    "roots": { "type": "array", "items": { "type": "string" }, "description": "Root directories to scan" },
+                    "query": { "type": "string", "description": "Search query / substring" },
                     "format": { "type": "string", "enum": ["sections", "markdown", "json", "address"], "default": "sections" },
-                    "context": { "type": "integer", "default": 2, "description": "Число контекстных строк вокруг совпадения" }
+                    "context": { "type": "integer", "default": 2, "description": "Number of context lines around matches" }
                 }
             }
         }),
         json!({
             "name": "poler_grep",
-            "description": "Потоковый параллельный grep по дереву каталогов с учётом .gitignore (замена ripgrep). Быстрый поиск строк или regex с номерами строк, смещениями и контекстом -A/-B/-C.",
+            "description": "Streaming parallel project grep with .gitignore awareness (replaces ripgrep). Fast literal or regex matching with line numbers, offsets, and -A/-B/-C context.",
             "inputSchema": {
                 "type": "object",
                 "required": ["roots", "pattern"],
                 "properties": {
-                    "roots": { "type": "array", "items": { "type": "string" }, "description": "Каталоги или файлы" },
-                    "pattern": { "type": "string", "description": "Искомая строка или регулярное выражение" },
+                    "roots": { "type": "array", "items": { "type": "string" }, "description": "Directories or files to scan" },
+                    "pattern": { "type": "string", "description": "Search string or regular expression" },
                     "mode": { "type": "string", "enum": ["literal", "regex"], "default": "literal" },
                     "case_sensitive": { "type": "boolean", "default": true },
                     "context_before": { "type": "integer", "default": 0 },
@@ -621,41 +621,41 @@ fn mcp_tools_catalog() -> Vec<Value> {
         }),
         json!({
             "name": "poler_read_span",
-            "description": "Прочитать диапазон строк [line .. line+count) из файла любого размера (zero-copy mmap Piece-Table) БЕЗ обрезки длинных строк на 8192 байтах. Возвращает текст и текущую CAS-ревизию rev.",
+            "description": "Read line span [line .. line+count) from a file of any size (zero-copy mmap Piece-Table) without line truncation. Returns text and current CAS revision rev.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string", "description": "Путь к файлу на диске" },
-                    "doc": { "type": "integer", "description": "Опциональный ID уже открытого буфера/форка" },
-                    "line": { "type": "integer", "description": "Начальная строка (0-based)", "default": 0 },
-                    "count": { "type": "integer", "description": "Количество строк для чтения", "default": 200 },
-                    "max_bytes": { "type": "integer", "description": "Лимит байтов ответа (до 64 МиБ)", "default": 4194304 }
+                    "path": { "type": "string", "description": "Path to file on disk" },
+                    "doc": { "type": "integer", "description": "Optional ID of already open buffer/fork" },
+                    "line": { "type": "integer", "description": "Starting line (0-based)", "default": 0 },
+                    "count": { "type": "integer", "description": "Number of lines to read", "default": 200 },
+                    "max_bytes": { "type": "integer", "description": "Maximum response bytes (up to 64 MiB)", "default": 4194304 }
                 }
             }
         }),
         json!({
             "name": "poler_replace_match",
-            "description": "Контент-адресуемая замена подстроки old_text -> new_text без ручного подсчёта байтов. Автоматически адаптирует CRLF/LF, проверяет уникальность (или привязывает к near_line) и при check_syntax=true мгновенно откатывает правку при нарушении баланса скобок 𝕋≠0.",
+            "description": "Content-addressed replacement of old_text -> new_text without manual byte counting. Automatically adapts CRLF/LF, checks uniqueness (or binds to near_line), and atomically rolls back on bracket imbalance 𝕋≠0 when check_syntax=true.",
             "inputSchema": {
                 "type": "object",
                 "required": ["old_text", "new_text"],
                 "properties": {
-                    "path": { "type": "string", "description": "Путь к файлу" },
-                    "doc": { "type": "integer", "description": "Опциональный ID буфера/форка" },
-                    "old_text": { "type": "string", "description": "Точный заменяемый фрагмент" },
-                    "new_text": { "type": "string", "description": "Новый текст" },
-                    "near_line": { "type": "integer", "description": "Опциональный ориентир строки (0-based) при нескольких вхождениях" },
-                    "occurrence": { "type": "integer", "description": "1-based номер конкретного вхождения" },
+                    "path": { "type": "string", "description": "Path to file" },
+                    "doc": { "type": "integer", "description": "Optional ID of open buffer/fork" },
+                    "old_text": { "type": "string", "description": "Exact text snippet to replace" },
+                    "new_text": { "type": "string", "description": "New replacement text" },
+                    "near_line": { "type": "integer", "description": "Optional line hint (0-based) for disambiguation" },
+                    "occurrence": { "type": "integer", "description": "1-based index of specific occurrence" },
                     "replace_all": { "type": "boolean", "default": false },
-                    "check_syntax": { "type": "boolean", "default": true, "description": "Атомарный откат, если правка ломает баланс скобок 𝕋=0" },
-                    "expected_rev": { "type": "integer", "description": "Опциональная CAS-защита ревизии буфера" },
+                    "check_syntax": { "type": "boolean", "default": true, "description": "Atomic rollback if edit breaks bracket balance 𝕋=0" },
+                    "expected_rev": { "type": "integer", "description": "Optional CAS buffer revision guard" },
                     "auto_save": { "type": "boolean", "default": true }
                 }
             }
         }),
         json!({
             "name": "poler_apply_batch",
-            "description": "Атомарная транзакция из нескольких правок (все или ничего, один шаг Undo, применение снизу вверх без сдвига смещений, синтаксический барьер 𝕋=0).",
+            "description": "Atomic multi-edit transaction (all or nothing, single undo step, bottom-up application without offset shifting, 𝕋=0 syntax barrier).",
             "inputSchema": {
                 "type": "object",
                 "required": ["ops"],
@@ -666,7 +666,7 @@ fn mcp_tools_catalog() -> Vec<Value> {
                         "type": "array",
                         "items": {
                             "type": "object",
-                            "description": "Элемент с op='replace_match' ({old_text,new_text,near_line?}) или op='replace_range' ({start_line,start_col,end_line,end_col,text})"
+                            "description": "Item with op='replace_match' ({old_text,new_text,near_line?}) or op='replace_range' ({start_line,start_col,end_line,end_col,text})"
                         }
                     },
                     "check_syntax": { "type": "boolean", "default": true },
@@ -677,14 +677,14 @@ fn mcp_tools_catalog() -> Vec<Value> {
         }),
         json!({
             "name": "poler_apply_diff",
-            "description": "Наложить стандартный Unified Diff (@@ -a,b +c,d @@) напрямую на Piece-Table буфер с нечётким поиском контекста ±fuzz строк и проверкой баланса скобок 𝕋=0.",
+            "description": "Apply standard Unified Diff (@@ -a,b +c,d @@) directly onto Piece-Table buffer with ±fuzz context tolerance and 𝕋=0 bracket check.",
             "inputSchema": {
                 "type": "object",
                 "required": ["diff"],
                 "properties": {
                     "path": { "type": "string" },
                     "doc": { "type": "integer" },
-                    "diff": { "type": "string", "description": "Текст патча Unified Diff" },
+                    "diff": { "type": "string", "description": "Unified Diff patch text" },
                     "fuzz": { "type": "integer", "default": 3 },
                     "check_syntax": { "type": "boolean", "default": true },
                     "expected_rev": { "type": "integer" },
@@ -694,7 +694,7 @@ fn mcp_tools_catalog() -> Vec<Value> {
         }),
         json!({
             "name": "poler_piece_diff",
-            "description": "Сгенерировать Unified Diff несохранённых изменений буфера за O(pieces) БЕЗ сканирования нетронутых гигабайт mmap.",
+            "description": "Generate Unified Diff of unsaved buffer changes in O(pieces) without scanning untouched gigabytes of mmap.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -706,7 +706,7 @@ fn mcp_tools_catalog() -> Vec<Value> {
         }),
         json!({
             "name": "poler_search",
-            "description": "Многопоточный SIMD / Aho-Corasick поиск по файлу любого размера с ε-значимостью, проективной плотностью [N:D] и Q8-резонансом. rank_by=\"epsilon\" (или \"resonance\") + min_epsilon отсекают шаблонный шум: 5000 тривиальных вхождений сжимаются до десятка смысловых фрагментов — экономия ~90% токенов агента.",
+            "description": "Multi-threaded SIMD / Aho-Corasick search across any file size with ε-significance, projective density [N:D], and Q8 resonance. rank_by=\"epsilon\" (or \"resonance\") + min_epsilon prune boilerplate: 5000 trivial matches compressed to top semantic fragments — saves ~90% agent tokens.",
             "inputSchema": {
                 "type": "object",
                 "required": ["query"],
@@ -720,36 +720,36 @@ fn mcp_tools_catalog() -> Vec<Value> {
                         "type": "string",
                         "enum": ["byte", "epsilon", "resonance"],
                         "default": "byte",
-                        "description": "byte — порядок в файле; epsilon — по убыванию ε (смысловые первыми); resonance — по Q8-резонансу R"
+                        "description": "byte — file order; epsilon — descending significance ε (semantic matches first); resonance — Q8 resonance R"
                     },
                     "min_epsilon": {
                         "type": "number",
-                        "description": "Порог фильтра ε (например 0.4): совпадения с меньшей значимостью отбрасываются (счётчик dropped_low_epsilon)"
+                        "description": "Filter threshold ε (e.g. 0.4): lower significance matches dropped"
                     }
                 }
             }
         }),
         json!({
             "name": "poler_saccade",
-            "description": "ε_high (макро-энергия, Виртуальные глаза ИИ): топологический скелет файла за 1 шаг — символы (fn/struct/impl/mod/заголовки Markdown) с координатами строк + пики построчной ε-значимости. Карта документа без чтения всего текста; прыгайте к узлу через poler_scroll(from_line=...) или poler_seek_energy.",
+            "description": "Virtual AI Eye: Saccade. One-step document topological map (outline, top energy peaks ε, AST anchors). Inspect full structure without loading entire file; jump to any node via poler_scroll(from_line=...) or poler_seek_energy.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string", "description": "Путь к файлу на диске" },
-                    "doc": { "type": "integer", "description": "Опциональный ID открытого буфера" },
-                    "max_nodes": { "type": "integer", "default": 120, "description": "Максимум узлов и пиков в ответе" }
+                    "path": { "type": "string", "description": "Path to file on disk" },
+                    "doc": { "type": "integer", "description": "Optional open buffer ID" },
+                    "max_nodes": { "type": "integer", "default": 120, "description": "Maximum nodes and peaks in response" }
                 }
             }
         }),
         json!({
             "name": "poler_scroll",
-            "description": "ε_low (микро-энергия) + построчный скролл с УДЕРЖАНИЕМ КУРСОРА: считывает N строк от текущей позиции виртуального глаза (line_cursor хранится ядром между вызовами). Фовеальное окно ИИ: читать гигабайтные файлы шагами, перечитывать любую строку остановки, двигаться вперёд/назад.",
+            "description": "Virtual AI Eye: Smooth reading window with cursor tracking. Reads N lines from active position (kernel maintains line_cursor across calls). Foveal reading window for arbitrary file sizes.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string", "description": "Путь к файлу на диске" },
-                    "doc": { "type": "integer", "description": "Опциональный ID открытого буфера" },
-                    "from_line": { "type": "integer", "description": "0-based; если опущено — продолжить с последней точки остановки курсора глаза" },
+                    "path": { "type": "string", "description": "Path to file on disk" },
+                    "doc": { "type": "integer", "description": "Optional open buffer ID" },
+                    "from_line": { "type": "integer", "description": "0-based start line; if omitted continues from current cursor" },
                     "lines": { "type": "integer", "default": 25 },
                     "direction": { "type": "string", "enum": ["forward", "backward"], "default": "forward" }
                 }
@@ -757,20 +757,20 @@ fn mcp_tools_catalog() -> Vec<Value> {
         }),
         json!({
             "name": "poler_seek_energy",
-            "description": "Авто-саккада: прыжок курсора виртуального глаза к следующему/предыдущему пику ε (энергетическому всплеску значимости) от текущей позиции. Возвращает фовеальное окно 5 строк на пике.",
+            "description": "Virtual AI Eye: Jump to semantic energy peak (function headers, classes, core algorithms, high-density zones). Returns 5-line foveal window around peak.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "path": { "type": "string", "description": "Путь к файлу на диске" },
-                    "doc": { "type": "integer", "description": "Опциональный ID открытого буфера" },
+                    "path": { "type": "string", "description": "Path to file on disk" },
+                    "doc": { "type": "integer", "description": "Optional open buffer ID" },
                     "direction": { "type": "string", "enum": ["next_peak", "prev_peak"], "default": "next_peak" },
-                    "from_line": { "type": "integer", "description": "Опциональная стартовая позиция (иначе курсор глаза)" }
+                    "from_line": { "type": "integer", "description": "Optional starting line (defaults to active cursor)" }
                 }
             }
         }),
         json!({
             "name": "poler_verify_syntax",
-            "description": "Мгновенная предкомпиляционная верификация троичной ленты скобок ({-1, 0, +1}, вакуум pack5 = 121) с точными координатами первой сломанной скобки.",
+            "description": "Instant pre-compilation verification of balanced bracket tape ({-1, 0, +1}, pack5 vacuum = 121) with coordinates of first broken bracket.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -781,32 +781,32 @@ fn mcp_tools_catalog() -> Vec<Value> {
         }),
         json!({
             "name": "poler_outline",
-            "description": "Извлечь структурное дерево символов кода (fn, struct, class, impl, mod, enum) или заголовков Markdown с точными строками начала/конца скоупа (или breadcrumbs для конкретной line).",
+            "description": "Extract code symbol tree (fn, struct, class, impl, mod, enum) or Markdown headings with exact scope bounds (or breadcrumbs for a specific line).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "path": { "type": "string" },
                     "doc": { "type": "integer" },
-                    "line": { "type": "integer", "description": "Если указана, возвращает цепочку вложенных скоупов breadcrumbs для этой строки" }
+                    "line": { "type": "integer", "description": "If specified, returns chain of enclosing breadcrumbs for this line" }
                 }
             }
         }),
         json!({
             "name": "poler_project_impact",
-            "description": "AIDDE-анализ радиуса поражения символа по проектному CSR Call-Graph в pack5 (0.2 Б/связь в L3-кэше): определения, вызывающие функции (+1), мутирующие/unsafe вызовы (-1) и уровень риска.",
+            "description": "AIDDE project call-graph blast radius: upstream callers (+1), mutating/unsafe calls (-1), and risk level across repository.",
             "inputSchema": {
                 "type": "object",
                 "required": ["symbol"],
                 "properties": {
-                    "root": { "type": "string", "description": "Корневая директория проекта" },
-                    "symbol": { "type": "string", "description": "Имя функции, метода или структуры" },
+                    "root": { "type": "string", "description": "Project root directory" },
+                    "symbol": { "type": "string", "description": "Function, method, or struct name" },
                     "refresh": { "type": "boolean", "default": false }
                 }
             }
         }),
         json!({
             "name": "poler_semantic_search",
-            "description": "Сверхбыстрый семантический поиск по скоупам проекта на 52-байтных троичных сигнатурах TritSig256 (SSSE3 psignb без умножителей + проективное ранжирование [N:D] + контрактный фильтр LENS).",
+            "description": "Fast semantic search over project scopes using 52-byte ternary signatures TritSig256 (SSSE3 psignb without multipliers + projective [N:D] ranking + LENS filter).",
             "inputSchema": {
                 "type": "object",
                 "required": ["query"],
@@ -814,14 +814,14 @@ fn mcp_tools_catalog() -> Vec<Value> {
                     "root": { "type": "string" },
                     "query": { "type": "string" },
                     "limit": { "type": "integer", "default": 15 },
-                    "require_flags": { "type": "integer", "default": 0, "description": "Битовая маска: 1=pub, 2=fn, 4=type, 8=unsafe/mut, 16=test, 32=markdown" },
+                    "require_flags": { "type": "integer", "default": 0, "description": "Bitmask: 1=pub, 2=fn, 4=type, 8=unsafe/mut, 16=test, 32=markdown" },
                     "forbid_flags": { "type": "integer", "default": 0 }
                 }
             }
         }),
         json!({
             "name": "poler_fork_doc",
-            "description": "Создать мгновенный zero-copy форк буфера за O(pieces) в оперативной памяти для параллельной проверки гипотез несколькими агентами без копирования файла.",
+            "description": "Create instant zero-copy buffer fork in RAM in O(pieces) for speculative edits without touching disk.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -832,7 +832,7 @@ fn mcp_tools_catalog() -> Vec<Value> {
         }),
         json!({
             "name": "poler_merge_fork",
-            "description": "Трёхстороннее слияние спекулятивных форков (base_doc, ours_doc, theirs_doc) на троичной алгебре Клини 𝕋.",
+            "description": "Three-way merge of speculative forks (base_doc, ours_doc, theirs_doc) on Kleene ternary algebra 𝕋.",
             "inputSchema": {
                 "type": "object",
                 "required": ["base_doc", "ours_doc", "theirs_doc"],
@@ -847,7 +847,7 @@ fn mcp_tools_catalog() -> Vec<Value> {
         }),
         json!({
             "name": "poler_tx_save_all",
-            "description": "Двухфазное транзакционное сохранение всех изменённых буферов с предварительной проверкой внешних конфликтов на диске (disk_conflict).",
+            "description": "Two-phase transactional commit of all modified buffers with external disk conflict check (no files overwritten on conflict).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -858,7 +858,7 @@ fn mcp_tools_catalog() -> Vec<Value> {
         }),
         json!({
             "name": "poler_extract_doc",
-            "description": "Офлайн-извлечение чистого структурированного текста из PDF, DOCX, EPUB, FB2, MOBI, HTML.",
+            "description": "Extract structured Markdown text from PDF, DOCX, EPUB, FB2, MOBI, HTML.",
             "inputSchema": {
                 "type": "object",
                 "required": ["path"],
@@ -870,7 +870,7 @@ fn mcp_tools_catalog() -> Vec<Value> {
         }),
         json!({
             "name": "poler_list_docs",
-            "description": "Список всех открытых вкладок/буферов ядра, их CAS-ревизий rev и аппаратный CPUID-паспорт кремния Trit-Silicon.",
+            "description": "List all open kernel buffers, CAS revisions rev, and CPUID hardware capabilities.",
             "inputSchema": {
                 "type": "object",
                 "properties": {}
@@ -879,104 +879,104 @@ fn mcp_tools_catalog() -> Vec<Value> {
 
         json!({
             "name": "poler_vfs_mount",
-            "description": "Смонтировать любой архив/контейнер (.poler, .zip, .tar, .tar.gz, .epub...) в VFS-полигон БЕЗ распаковки: возвращает тип контейнера и листинг записей. Дальнейшие poler_scratch_put с provenance_path дедуплицируют черновики против содержимого архива в RAM.",
+            "description": "Mount any archive container (.poler, .zip, .tar, .tar.gz, .epub...) into VFS polygon without extraction: returns container kind and entry listing. Subsequent poler_scratch_put calls with provenance_path deduplicate drafts against archive contents in RAM.",
             "inputSchema": {
                 "type": "object",
                 "required": ["path"],
                 "properties": {
-                    "path": { "type": "string", "description": "Путь к архиву/контейнеру на диске" }
+                    "path": { "type": "string", "description": "Path to archive/container on disk" }
                 }
             }
         }),
         json!({
             "name": "poler_scratch_put",
-            "description": "Сохранить заметку/черновик/граф гипотезы в RAM-полигон vfs://ai_scratch/ — НОЛЬ байт на диске (git чист, SSD не трогается). Content-defined нарезка FastCDC + BLAKE3: черновик, дублирующий источник, разделяет с ним чанки и не занимает лишнюю RAM. provenance_path (+provenance_entry для записи архива) регистрирует базу-источник.",
+            "description": "Save note/draft/hypothesis graph to RAM polygon vfs://ai_scratch/ — ZERO bytes on disk (git clean, SSD untouched). Content-defined chunking with FastCDC + BLAKE3 deduplication.",
             "inputSchema": {
                 "type": "object",
                 "required": ["uri", "text"],
                 "properties": {
-                    "uri": { "type": "string", "description": "Имя записи, напр. hypo/refactor.md или полный vfs://ai_scratch/hypo/refactor.md" },
-                    "text": { "type": "string", "description": "Текст заметки/черновика" },
-                    "data_base64": { "type": "string", "description": "Альтернатива text: бинарные данные base64" },
-                    "provenance": { "type": "string", "description": "URI источника для отображения в GUI (например file:///src/main.rs)" },
-                    "provenance_path": { "type": "string", "description": "Путь файла-источника: его чанки станут общими с черновиком (дедуп RAM)" },
-                    "provenance_entry": { "type": "string", "description": "Запись внутри архива provenance_path (с учётом CoW-оверлея)" }
+                    "uri": { "type": "string", "description": "Entry name, e.g. hypo/refactor.md or full vfs://ai_scratch/hypo/refactor.md" },
+                    "text": { "type": "string", "description": "Text content of note/draft" },
+                    "data_base64": { "type": "string", "description": "Alternative to text: base64-encoded binary data" },
+                    "provenance": { "type": "string", "description": "Source URI for GUI display (e.g. file:///src/main.rs)" },
+                    "provenance_path": { "type": "string", "description": "Source file path: chunks shared with draft for RAM deduplication" },
+                    "provenance_entry": { "type": "string", "description": "Entry within archive provenance_path" }
                 }
             }
         }),
         json!({
             "name": "poler_scratch_get",
-            "description": "Пересобрать запись RAM-полигона из чанков (бит-в-бит) и вернуть текст (или base64 при text=false).",
+            "description": "Reassemble RAM polygon entry bit-for-bit from chunks and return text (or base64 if text=false).",
             "inputSchema": {
                 "type": "object",
                 "required": ["uri"],
                 "properties": {
-                    "uri": { "type": "string", "description": "Имя записи или полный vfs://ai_scratch/... URI" },
-                    "text": { "type": "boolean", "default": true, "description": "false — вернуть data_base64" }
+                    "uri": { "type": "string", "description": "Entry name or full vfs://ai_scratch/... URI" },
+                    "text": { "type": "boolean", "default": true, "description": "false to return data_base64" }
                 }
             }
         }),
         json!({
             "name": "poler_scratch_list",
-            "description": "Список записей RAM-полигона с дедуп-статистикой: логический объём, физический след в RAM (только уникальные чанки), коэффициент дедупликации. Диск всегда 0 байт.",
+            "description": "List RAM polygon entries with deduplication stats: logical size, physical RAM footprint (unique chunks only), deduplication ratio. Disk usage always 0 bytes.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "pattern": { "type": "string", "description": "Подстрока-фильтр имён" }
+                    "pattern": { "type": "string", "description": "Substring filter for names" }
                 }
             }
         }),
         json!({
             "name": "poler_scratch_discard",
-            "description": "Мгновенный откат идеи: стереть одну запись полигона (или всё поле all=true) за микросекунды. Сиротские чанки освобождаются, RAM возвращается.",
+            "description": "Instant rollback: delete a single polygon entry (or all if all=true) in microseconds. Orphan chunks freed, RAM returned.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "uri": { "type": "string", "description": "Имя записи (либо all=true)" },
-                    "all": { "type": "boolean", "default": false, "description": "Стереть весь полигон" }
+                    "uri": { "type": "string", "description": "Entry name (or all=true)" },
+                    "all": { "type": "boolean", "default": false, "description": "Clear entire polygon" }
                 }
             }
         }),
         json!({
             "name": "poler_vfs_apply",
-            "description": "Атомарная материализация выверенной идеи из полигона: target+entry → CoW-оверлей смонтированного архива (на диск — vfs_flush), либо target-файл → atomic write (tmp+fsync+rename). Полу-записанных файлов не бывает.",
+            "description": "Atomic materialization of draft from polygon: target+entry → CoW overlay of mounted archive (persisted via vfs_flush), or target file → atomic write (tmp+fsync+rename). No half-written files.",
             "inputSchema": {
                 "type": "object",
                 "required": ["uri", "target"],
                 "properties": {
-                    "uri": { "type": "string", "description": "Запись полигона для материализации" },
-                    "target": { "type": "string", "description": "Путь файла на диске ИЛИ путь архива (тогда обязательно entry)" },
-                    "entry": { "type": "string", "description": "Запись внутри архива target (режим CoW-оверлея)" }
+                    "uri": { "type": "string", "description": "Polygon entry to materialize" },
+                    "target": { "type": "string", "description": "Disk file path OR archive path (entry required for archive)" },
+                    "entry": { "type": "string", "description": "Entry inside target archive (CoW overlay mode)" }
                 }
             }
         }),
         json!({
             "name": "poler_crystal_note",
-            "description": "Прошить заметку в Кристалл Знаний (ассоциативная память агента): новые слова получают id за O(1) (Dynamic Vocab Expansion), пары соседей — Хеббовское укрепление троичных синапсов {−1,0,+1}. Кристалл переживает перезапуск через crystal_save/crystal_load (.t5c).",
+            "description": "Embed note into Knowledge Crystal (agent associative memory): new words registered in O(1), neighbor pairs receive Hebbian ternary synapse strengthening {−1,0,+1}.",
             "inputSchema": {
                 "type": "object",
                 "required": ["text"],
                 "properties": {
-                    "text": { "type": "string", "description": "Текст заметки (структура бага, план, гипотеза)" }
+                    "text": { "type": "string", "description": "Note text (bug anatomy, plan, hypothesis)" }
                 }
             }
         }),
         json!({
             "name": "poler_crystal_assoc",
-            "description": "Резонансный запрос к Кристаллу: что связано с этим словом? Семантические соседи (CSE-триты золотой фазы) + партнёры совместной встречаемости (биграммы +1 в обе стороны). Subword-фолбек раскладывает неизвестное слово на подтокены.",
+            "description": "Resonant query to Knowledge Crystal: find associated concepts, semantic neighbors (CSE trits), and co-occurrence partners.",
             "inputSchema": {
                 "type": "object",
                 "required": ["word"],
                 "properties": {
-                    "word": { "type": "string", "description": "Слово (неизвестное разложится на подтокены)" },
-                    "sem_k": { "type": "integer", "default": 4, "description": "Сколько семантических соседей (1..32)" },
-                    "bi_k": { "type": "integer", "default": 8, "description": "Сколько партнёров встречаемости (1..64)" }
+                    "word": { "type": "string", "description": "Seed word or concept" },
+                    "sem_k": { "type": "integer", "default": 4, "description": "Number of semantic neighbors (1..32)" },
+                    "bi_k": { "type": "integer", "default": 8, "description": "Number of co-occurrence partners (1..64)" }
                 }
             }
         }),
         json!({
             "name": "poler_crystal_stats",
-            "description": "Паспорт Кристалла Знаний сессии: словарь, корпус, плотность биграммной топологии, порог θ_hi, формат t5c/v1 и источник (зашитый crystal_ru.t5c или загруженный файл).",
+            "description": "Knowledge Crystal session passport: vocabulary size, corpus stats, bigram density, threshold θ_hi, format t5c/v1.",
             "inputSchema": {
                 "type": "object",
                 "properties": {}
@@ -984,30 +984,30 @@ fn mcp_tools_catalog() -> Vec<Value> {
         }),
         json!({
             "name": "poler_crystal_load",
-            "description": "Смонтировать Кристалл Знаний из файла .t5c (Trit5 Crystal v1): SHA-256 тела проверяется, повреждённый кристалл отвергается. Заменяет кристалл сессии.",
+            "description": "Mount Knowledge Crystal from .t5c file (Trit5 Crystal v1): SHA-256 integrity verified. Replaces session crystal.",
             "inputSchema": {
                 "type": "object",
                 "required": ["path"],
                 "properties": {
-                    "path": { "type": "string", "description": "Путь к .t5c" },
-                    "dims": { "type": "integer", "default": 96, "description": "Размерность CSE-вложений (16..512)" }
+                    "path": { "type": "string", "description": "Path to .t5c" },
+                    "dims": { "type": "integer", "default": 96, "description": "CSE embedding dimension (16..512)" }
                 }
             }
         }),
         json!({
             "name": "poler_crystal_save",
-            "description": "Сохранить Кристалл сессии (со всеми Хеббовскими сдвигами и расширенным словарём) как детерминированный .t5c: заголовок 0x50, Trit5-упакованные биграммы, SHA-256 тела. Файл 20 КБ – 2 МБ, монтируется обратно за миллисекунды.",
+            "description": "Persist session Knowledge Crystal as deterministic .t5c file (Trit5-packed bigrams, SHA-256 payload checksum). Fast reload in milliseconds.",
             "inputSchema": {
                 "type": "object",
                 "required": ["path"],
                 "properties": {
-                    "path": { "type": "string", "description": "Куда записать .t5c" }
+                    "path": { "type": "string", "description": "Destination .t5c path" }
                 }
             }
         }),
         json!({
             "name": "poler_engine_status",
-            "description": "Фаза 5+ «Живой движок»: статус поля демона poler-engine — где найден бинарь (PATH / ~/.local/bin / POLER_ENGINE_BIN / вендоренная копия), версия движка, состояние MCP-гейта (addr/pid/uptime). Демон поднимается лениво при первом engine_search / engine_grep.",
+            "description": "Live Engine Gate: check status of poler-engine daemon binary location, version, and MCP gate connectivity (addr/pid/uptime).",
             "inputSchema": {
                 "type": "object",
                 "properties": {}
@@ -1015,26 +1015,26 @@ fn mcp_tools_catalog() -> Vec<Value> {
         }),
         json!({
             "name": "poler_engine_search",
-            "description": "ε-поиск ЖИВОГО движка poler-engine по файлу/репозиторию через сетевой MCP-гейт: полные логические сцены (не строки grep), информационная плотность ε, резонанс R, K-hop связи. Демон тёплый — индекс живёт между вызовами.",
+            "description": "Semantic ε-search via live poler-engine gate: full logical scenes, information density ε, resonance R, K-hop connectivity across repository.",
             "inputSchema": {
                 "type": "object",
                 "required": ["path", "query"],
                 "properties": {
-                    "path": { "type": "string", "description": "Файл или корень репозитория" },
-                    "query": { "type": "string", "description": "Слово или фраза" },
+                    "path": { "type": "string", "description": "Target file or repository root" },
+                    "query": { "type": "string", "description": "Query term or phrase" },
                     "top": { "type": "integer", "default": 5, "minimum": 1, "maximum": 20 }
                 }
             }
         }),
         json!({
             "name": "poler_engine_grep",
-            "description": "Точный grep живого движка (замена ripgrep): ВСЕ совпадения, обход с .gitignore, контекст -A/-B, счётчики, машинно-читаемый JSON-отчёт. Гарантия полноты: «ноль значит ноль».",
+            "description": "Exact grep via live engine: exhaustive matches, .gitignore traversal, -A/-B context, structured JSON report.",
             "inputSchema": {
                 "type": "object",
                 "required": ["pattern"],
                 "properties": {
-                    "path": { "type": "string", "default": ".", "description": "Файл или корень обхода" },
-                    "pattern": { "type": "string", "description": "Искомая строка или regex" },
+                    "path": { "type": "string", "default": ".", "description": "File or traversal root" },
+                    "pattern": { "type": "string", "description": "Search pattern or regex" },
                     "regex": { "type": "boolean", "default": false },
                     "ignore_case": { "type": "boolean", "default": false },
                     "output": { "type": "string", "enum": ["content", "count", "list", "list_nonmatching"], "default": "content" },
@@ -1046,64 +1046,64 @@ fn mcp_tools_catalog() -> Vec<Value> {
         }),
         json!({
             "name": "poler_engine_pack",
-            "description": "Упаковка каталога в сжатый .poler живым движком (--pack): FastCDC + BLAKE3-дедуп между файлами + zstd, пофайловая таблица, права 0o755 сохраняются. Закон масштаба: повторы между файлами схлопываются. Возвращает статистику (files, raw_bytes, ratio, peak_rss_kb).",
+            "description": "Pack directory into compressed .poler archive (--pack): FastCDC + BLAKE3 deduplication + zstd, preserving permissions. Inter-file redundancies collapsed.",
             "inputSchema": {
                 "type": "object",
                 "required": ["path"],
                 "properties": {
-                    "path": { "type": "string", "description": "Каталог для упаковки (WYSIWYG: всё содержимое)" },
-                    "out": { "type": "string", "description": "Выходной .poler (по умолчанию <путь>.poler)" },
-                    "gitignore": { "type": "boolean", "default": false, "description": "Уважать .gitignore и пропускать скрытые (режим репо-чекаута)" },
-                    "jobs": { "type": "integer", "default": 0, "description": "Потоки сжатия (0 = все ядра)" }
+                    "path": { "type": "string", "description": "Directory to pack" },
+                    "out": { "type": "string", "description": "Output .poler path (defaults to <path>.poler)" },
+                    "gitignore": { "type": "boolean", "default": false, "description": "Respect .gitignore and skip hidden files" },
+                    "jobs": { "type": "integer", "default": 0, "description": "Compression threads (0 = all cores)" }
                 }
             }
         }),
         json!({
             "name": "poler_engine_squeeze",
-            "description": "Дотискание контейнера живым движком (--stream-file) — «закон семантики»: TAR/tar.gz/tar.zst/gz/zst РАЗВОРАЧИВАЮТСЯ НА ЛЕТУ, файлы ложатся в .poler пофайловой таблицей с BLAKE3-дедупом. ELF/PE64 (v0.94.0 BINFMT) сегментируются по секциям .text/.rdata: границы чанков совпадают с границами секций, записи pe:.text/elf:.rodata — дедупликация кода между соседними сборками. Сжатое сжимается ещё сильнее, потому что движок понимает формат.",
+            "description": "Stream-compress container into .poler format with semantic deduplication: unpacks TAR/tar.gz/tar.zst on the fly with per-file table and section-aware chunk boundaries.",
             "inputSchema": {
                 "type": "object",
                 "required": ["path"],
                 "properties": {
-                    "path": { "type": "string", "description": "Файл-контейнер: tar / tar.gz / tar.zst / gz / zst / ELF / PE64 (.exe/.dll) / ..." },
-                    "out": { "type": "string", "description": "Выходной .poler (по умолчанию <имя>.poler)" }
+                    "path": { "type": "string", "description": "Container path: tar / tar.gz / tar.zst / gz / zst / ELF / PE64 / ..." },
+                    "out": { "type": "string", "description": "Output .poler path (defaults to <name>.poler)" }
                 }
             }
         }),
         json!({
             "name": "poler_engine_archive_ls",
-            "description": "Листинг любого архива живым движком БЕЗ распаковки (--archive-list --archive-json): .poler, .zip, .tar, .tar.gz, .epub — записи, размеры, флаги сжатия/шифрования.",
+            "description": "Zero-copy inspection and listing of any archive without extraction: .poler, .zip, .tar, .tar.gz, .epub.",
             "inputSchema": {
                 "type": "object",
                 "required": ["path"],
                 "properties": {
-                    "path": { "type": "string", "description": "Путь к архиву на диске" }
+                    "path": { "type": "string", "description": "Path to archive on disk" }
                 }
             }
         }),
         json!({
             "name": "poler_engine_impact",
-            "description": "AIDDE impact-радар живого движка: call graph + upstream/downstream паспорт символа по всему проекту (кто вызовет, кого затронет правка) — до компиляции. Работает на гигантских базах (--impact-cache SQLite).",
+            "description": "AIDDE impact radar: call graph + upstream/downstream symbol dependencies across entire project.",
             "inputSchema": {
                 "type": "object",
                 "required": ["path", "symbol"],
                 "properties": {
-                    "path": { "type": "string", "description": "Корень проекта" },
-                    "symbol": { "type": "string", "description": "Имя функции/метода/структуры" },
-                    "depth": { "type": "integer", "description": "Глубина BFS (0 = по умолчанию движка)" }
+                    "path": { "type": "string", "description": "Project root directory" },
+                    "symbol": { "type": "string", "description": "Target function, method, or struct name" },
+                    "depth": { "type": "integer", "description": "BFS traversal depth" }
                 }
             }
         }),
         json!({
             "name": "poler_engine_crystal_ingest",
-            "description": "Кристаллизация корпуса живым движком (--crystal-ingest-dir): каталог с текстами/кодом или .poler-архив → ассоциативный Кристалл Знаний .t5c (Trit5, троичные синапсы). Корпусная память для долгих сессий агента.",
+            "description": "Crystallize text or code corpus into associative Knowledge Crystal .t5c (Trit5 ternary synapses) for persistent multi-turn agent memory.",
             "inputSchema": {
                 "type": "object",
                 "required": ["path"],
                 "properties": {
-                    "path": { "type": "string", "description": "Каталог с текстами или .poler-архив" },
-                    "out": { "type": "string", "description": "Выходной .t5c (по умолчанию <имя>.t5c)" },
-                    "vocab": { "type": "integer", "default": 0, "description": "Размер словаря (0 = авто: 4096)" }
+                    "path": { "type": "string", "description": "Text directory or .poler archive" },
+                    "out": { "type": "string", "description": "Output .t5c path (defaults to <name>.t5c)" },
+                    "vocab": { "type": "integer", "default": 0, "description": "Vocabulary size limit (0 = auto: 4096)" }
                 }
             }
         }),

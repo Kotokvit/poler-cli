@@ -215,10 +215,10 @@ impl PolerBuffer {
         replace_all: bool,
     ) -> Result<Vec<(u64, u64, Vec<u8>, u64)>, String> {
         if old_text.is_empty() {
-            return Err("invalid_argument: old_text не может быть пустым".to_string());
+            return Err("invalid_argument: old_text cannot be empty".to_string());
         }
         if new_text.len() > MAX_EDIT_PAYLOAD_BYTES {
-            return Err("payload_too_large: new_text превышает лимит 64 МиБ".to_string());
+            return Err("payload_too_large: new_text exceeds 64 MiB limit".to_string());
         }
         let snap = self.snapshot();
         let cancel = AtomicBool::new(false);
@@ -242,7 +242,7 @@ impl PolerBuffer {
         }
 
         if run.hits.is_empty() {
-            return Err("match_not_found: точное вхождение old_text не найдено в буфере".to_string());
+            return Err("match_not_found: exact occurrence of old_text not found in buffer".to_string());
         }
 
         let new_bytes = effective_new.into_bytes();
@@ -257,7 +257,7 @@ impl PolerBuffer {
         if let Some(occ) = occurrence {
             if occ == 0 || occ > run.hits.len() {
                 return Err(format!(
-                    "occurrence_out_of_range: запрошено вхождение #{occ}, всего найдено {}",
+                    "occurrence_out_of_range: requested occurrence #{occ}, total found {}",
                     run.hits.len()
                 ));
             }
@@ -289,7 +289,7 @@ impl PolerBuffer {
 
         let sample_lines: Vec<u64> = run.hits.iter().take(12).map(|h| h.line).collect();
         Err(format!(
-            "ambiguous_match: найдено {} вхождений old_text (строки {:?}) — расширьте контекст или укажите near_line / occurrence",
+            "ambiguous_match: found {} occurrences of old_text (lines {:?}) — expand context or specify near_line / occurrence",
             run.hits.len(),
             sample_lines
         ))
@@ -306,11 +306,11 @@ impl PolerBuffer {
         for (s, e, rep) in &mut spans {
             if *s > *e || *e > total {
                 return Err(format!(
-                    "out_of_bounds: диапазон [{s}, {e}) выходит за пределы документа ({total} байт)"
+                    "out_of_bounds: range [{s}, {e}) exceeds document bounds ({total} bytes)"
                 ));
             }
             if rep.len() > MAX_EDIT_PAYLOAD_BYTES {
-                return Err("payload_too_large: замена превышает 64 МиБ".to_string());
+                return Err("payload_too_large: replacement exceeds 64 MiB limit".to_string());
             }
             *s = self.snap_to_char(*s);
             *e = self.snap_forward_char(*e);
@@ -320,7 +320,7 @@ impl PolerBuffer {
         for pair in spans.windows(2) {
             if pair[0].1 > pair[1].0 {
                 return Err(format!(
-                    "overlapping_edits: пересекающиеся диапазоны правок [{}, {}) и [{}, {})",
+                    "overlapping_edits: overlapping edit ranges [{}, {}) and [{}, {})",
                     pair[0].0, pair[0].1, pair[1].0, pair[1].1
                 ));
             }
@@ -390,10 +390,10 @@ impl PolerBuffer {
             let detail = verdict
                 .issues
                 .first()
-                .map(|iss| format!("строка {}, кол {}: {}", iss.line, iss.col, iss.message))
+                .map(|iss| format!("line {}, col {}: {}", iss.line, iss.col, iss.message))
                 .unwrap_or_else(|| format!("net_trit_sum={}", verdict.net_trit_sum));
             return Err(format!(
-                "trit_syntax_broken: правка откатана атомарно — нарушен баланс скобок 𝕋≠0 ({detail})"
+                "trit_syntax_broken: edit rolled back atomically — bracket balance 𝕋≠0 violated ({detail})"
             ));
         }
 
@@ -500,7 +500,7 @@ impl PolerBuffer {
     ) -> Result<MutationReceipt, String> {
         let hunks = parse_unified_hunks(diff_text)?;
         if hunks.is_empty() {
-            return Err("invalid_diff: в патче не найдено ни одного ханка @@ ... @@".to_string());
+            return Err("invalid_diff: no @@ ... @@ hunks found in patch".to_string());
         }
         let crlf = self.uses_crlf();
         let line_sep = if crlf { "\r\n" } else { "\n" };
@@ -776,7 +776,7 @@ pub fn merge_three_way(
         || ours.total_len() as usize > MAX_MERGE_BYTES
         || theirs.total_len() as usize > MAX_MERGE_BYTES
     {
-        return Err("merge_too_large: 3-way merge поддерживает буферы до 32 МиБ".to_string());
+        return Err("merge_too_large: 3-way merge supports buffers up to 32 MiB".to_string());
     }
 
     let base_raw = base.read_range(0, base.total_len() as usize);

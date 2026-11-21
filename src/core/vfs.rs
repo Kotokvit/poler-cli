@@ -207,7 +207,7 @@ fn zip_read(path: &Path, entry: &str, max_entry_bytes: u64) -> Result<Vec<u8>, S
         for i in 0..ar.len() {
             let zf = ar
                 .by_index_raw(i)
-                .map_err(|e| format!("{}: запись {i}: {e}", path.display()))?;
+                .map_err(|e| format!("{}: entry {i}: {e}", path.display()))?;
             let n = norm_name(zf.name());
             if n == decoded || n.ends_with(&format!("/{leaf}")) || n == leaf {
                 idx = Some(i);
@@ -215,13 +215,13 @@ fn zip_read(path: &Path, entry: &str, max_entry_bytes: u64) -> Result<Vec<u8>, S
             }
         }
     }
-    let i = idx.ok_or_else(|| format!("{}::{}: запис не знайдено", path.display(), entry))?;
+    let i = idx.ok_or_else(|| format!("{}::{}: entry not found", path.display(), entry))?;
     let mut zf = ar
         .by_index(i)
         .map_err(|e| format!("{}::{}: {e}", path.display(), entry))?;
     if zf.size() > max_entry_bytes {
         return Err(format!(
-            "{}::{}: несжатый размер {} байт > лимита {max_entry_bytes} байт — запис пропущено",
+            "{}::{}: uncompressed size {} bytes > limit {max_entry_bytes} bytes — entry skipped",
             path.display(),
             entry,
             zf.size()
@@ -250,10 +250,10 @@ fn tar_list(path: &Path, kind: VfsKind) -> Result<Vec<VfsEntry>, String> {
     let mut ar = tar::Archive::new(reader);
     let entries = ar
         .entries()
-        .map_err(|e| format!("{}: tar-записи: {e}", path.display()))?;
+        .map_err(|e| format!("{}: tar entries: {e}", path.display()))?;
     let mut out = Vec::new();
     for e in entries {
-        let e = e.map_err(|e| format!("{}: tar-запис: {e}", path.display()))?;
+        let e = e.map_err(|e| format!("{}: tar entry: {e}", path.display()))?;
         let header = e.header();
         let size = header.size().unwrap_or(0);
         let is_dir = header.entry_type().is_dir();
@@ -278,9 +278,9 @@ fn tar_read(path: &Path, entry: &str, max_entry_bytes: u64, kind: VfsKind) -> Re
     let mut ar = tar::Archive::new(reader);
     let entries = ar
         .entries()
-        .map_err(|e| format!("{}: tar-записи: {e}", path.display()))?;
+        .map_err(|e| format!("{}: tar entries: {e}", path.display()))?;
     for e in entries {
-        let mut e = e.map_err(|e| format!("{}: tar-запис: {e}", path.display()))?;
+        let mut e = e.map_err(|e| format!("{}: tar entry: {e}", path.display()))?;
         if e.header().entry_type().is_dir() {
             continue;
         }
@@ -294,7 +294,7 @@ fn tar_read(path: &Path, entry: &str, max_entry_bytes: u64, kind: VfsKind) -> Re
         let size = e.header().size().unwrap_or(0);
         if size > max_entry_bytes {
             return Err(format!(
-                "{}::{}: несжатый размер {size} байт > лимита {max_entry_bytes} байт — запис пропущено",
+                "{}::{}: uncompressed size {size} bytes > limit {max_entry_bytes} bytes — entry skipped",
                 path.display(),
                 entry
             ));
@@ -304,7 +304,7 @@ fn tar_read(path: &Path, entry: &str, max_entry_bytes: u64, kind: VfsKind) -> Re
             .map_err(|e| format!("{}::{}: {e}", path.display(), entry))?;
         return Ok(out);
     }
-    Err(format!("{}::{}: запис не знайдено", path.display(), entry))
+    Err(format!("{}::{}: entry not found", path.display(), entry))
 }
 
 // ---------------------------------------------------------------------------
@@ -424,7 +424,7 @@ impl PolerReader {
             let name_len = u16::from_le_bytes([bytes[p], bytes[p + 1]]) as usize;
             p += 2;
             if p + name_len + 48 > files_end {
-                return Err("файловая таблица: обрыв записи".to_string());
+                return Err("file table: unexpected end of record".to_string());
             }
             let name = String::from_utf8_lossy(&bytes[p..p + name_len]).to_string();
             p += name_len;
@@ -469,10 +469,10 @@ impl PolerReader {
             .files
             .iter()
             .find(|f| norm_name(&f.name) == norm)
-            .ok_or_else(|| format!("::{}: запис не знайдено", norm))?;
+            .ok_or_else(|| format!("::{}: entry not found", norm))?;
         if f.raw_len > max_entry_bytes {
             return Err(format!(
-                "::{}: несжатый размер {} байт > лимита {max_entry_bytes} байт — запис пропущено",
+                "::{}: uncompressed size {} bytes > limit {max_entry_bytes} bytes — entry skipped",
                 f.name, f.raw_len
             ));
         }
@@ -482,7 +482,7 @@ impl PolerReader {
     /// O(log n) поиск чанка, покрывающего raw_off.
     fn chunk_covering(&self, raw_off: u64) -> Result<usize, String> {
         if self.index.is_empty() {
-            return Err("контейнер пуст".to_string());
+            return Err("container is empty".to_string());
         }
         let mut lo = 0usize;
         let mut hi = self.index.len();
