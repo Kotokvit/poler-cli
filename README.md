@@ -76,11 +76,32 @@ poler view huge_server_log.txt --lines 1..50
 poler view specification.docx
 ```
 
-### 4. `poler patch` — In-Place Surgical Text Replacement
-Atomic zero-copy search-and-replace using Piece-Table:
+### 4. `poler patch` — In-Place Surgical Text Replacement & Dry-Run
+Atomic zero-copy search-and-replace using Piece-Table across plain text, logs, and containers (`.docx`, `.epub`, `.odt`, `.zip`, `.tar`):
 ```bash
+# Surgical atomic replacement in source file
 poler patch src/config.rs "debug: false" "debug: true"
+
+# Preview changes via Unified Diff without modifying disk (Dry-Run)
+poler patch src/config.rs "debug: false" "debug: true" --dry-run
+
+# Structured JSON output for AI agents (no stderr parsing needed)
+poler patch src/config.rs "debug: false" "debug: true" --json
+
+# Direct surgical patching inside archives and Office documents (.docx, .epub, .zip)
+poler patch book.docx "Chapter 1" "Prologue"
+poler patch archive.zip::nested/doc.txt "old_token" "new_token" --dry-run
 ```
+
+#### Differentiated Exit Codes for AI Agents
+| Exit Code | Symbol | Meaning & Recommended Action |
+|:---:|:---|:---|
+| **`0`** | `SUCCESS` | Replacement applied or dry-run unified diff generated successfully. |
+| **`1`** | `GENERAL_ERROR` | Archive rebuild error, I/O error, or binary data encountered. |
+| **`2`** | `USAGE_ERROR` | Missing arguments or invalid command-line invocation syntax. |
+| **`3`** | `NOT_FOUND` | `match_not_found`, `entry_not_found`, or `file_not_found` — needle not in buffer. |
+| **`4`** | `AMBIGUOUS_MATCH` | Needle occurs multiple times (lines reported) — expand context. |
+| **`5`** | `SYNTAX_BROKEN` | `trit_syntax_broken` — balanced bracket/delimiter check failed in $GF(3)$. |
 
 ### 5. `poler edit` — Headless JSON-RPC Editor Server
 Starts the stdio JSON-RPC interface for editors, IDEs, and automation:

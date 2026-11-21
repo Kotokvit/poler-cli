@@ -152,8 +152,8 @@ fn print_help() {
            poler harvest <ROOT> \"<QUERY>\" [flags]   Full-disk harvest with L1-L3 cache (.t5a) & ANSI highlighting\n  \
            poler grep \"<PATTERN>\" [PATH] [flags]    Streaming project grep with .gitignore awareness\n  \
            poler edit [PATH]                       Launch stdio JSON-RPC editor core for IDEs and agents\n  \
-           poler view <PATH> [--lines A..B]        Instant viewer for text, 40GB logs, DOCX, EPUB, PDF\n  \
-           poler patch <PATH> <OLD> <NEW>          Atomic surgical text replacement in file or archive\n  \
+           poler view <PATH> [--lines A..B] [--json] Instant viewer for text, 40GB logs, DOCX, EPUB, PDF\n  \
+           poler patch <PATH> <OLD> <NEW> [flags]  Atomic surgical replacement (--dry-run, --diff, --json, --entry)\n  \
            poler diff <PATH>                       Show diff of unsaved Piece-Table modifications\n  \
            poler mcp                               Unified stdio MCP server for Claude/Cursor/Antigravity\n  \
            poler schema                            Self-documenting JSON manifest of all tools\n\n\
@@ -381,9 +381,10 @@ fn run_grep_cli(args: &[String]) -> ExitCode {
 
 fn run_view_cli(args: &[String]) -> ExitCode {
     if args.is_empty() {
-        eprintln!("Usage: poler view <PATH[::ENTRY]> [--lines START..END]");
+        eprintln!("Usage: poler view <PATH[::ENTRY]> [--lines START..END] [--json]");
         return ExitCode::from(2);
     }
+    let as_json = args.iter().any(|a| a == "--json");
     let target_spec = &args[0];
     let (path, entry_from_spec) = if let Some((p, e)) = target_spec.split_once("::") {
         (PathBuf::from(p), Some(e.to_string()))
@@ -392,8 +393,12 @@ fn run_view_cli(args: &[String]) -> ExitCode {
     };
 
     if !path.exists() {
-        eprintln!("poler view: file not found: {}", path.display());
-        return ExitCode::from(2);
+        if as_json {
+            println!("{}", json!({"ok": false, "error_code": "file_not_found", "error": format!("file not found: {}", path.display())}));
+        } else {
+            eprintln!("poler view: file not found: {}", path.display());
+        }
+        return ExitCode::from(3);
     }
 
     // If VFS container and specific entry specified:
@@ -402,17 +407,35 @@ fn run_view_cli(args: &[String]) -> ExitCode {
         match poler_cli::core::vfs::vfs_read(&path, &norm, 4 << 20) {
             Ok(bytes) => match String::from_utf8(bytes) {
                 Ok(text) => {
-                    print!("{text}");
+                    if as_json {
+                        println!("{}", json!({
+                            "ok": true,
+                            "path": path.to_string_lossy(),
+                            "entry": norm,
+                            "bytes": text.len(),
+                            "text": text,
+                        }));
+                    } else {
+                        print!("{text}");
+                    }
                     return ExitCode::SUCCESS;
                 }
                 Err(_) => {
-                    eprintln!("poler view: entry '{norm}' contains binary data");
+                    if as_json {
+                        println!("{}", json!({"ok": false, "error_code": "binary_entry", "error": format!("entry '{norm}' contains binary data")}));
+                    } else {
+                        eprintln!("poler view: entry '{norm}' contains binary data");
+                    }
                     return ExitCode::from(1);
                 }
             },
             Err(e) => {
-                eprintln!("poler view: failed to read entry '{norm}': {e}");
-                return ExitCode::from(1);
+                if as_json {
+                    println!("{}", json!({"ok": false, "error_code": "entry_not_found", "error": format!("failed to read entry '{norm}': {e}")}));
+                } else {
+                    eprintln!("poler view: failed to read entry '{norm}': {e}");
+                }
+                return ExitCode::from(3);
             }
         }
     }
@@ -421,12 +444,26 @@ fn run_view_cli(args: &[String]) -> ExitCode {
     if poler_cli::core::extractor::is_extractable_format(&path) {
         match poler_cli::core::extractor::extract_text(&path) {
             Ok(Some(text)) => {
-                println!("{text}");
+                if as_json {
+                    println!("{}", json!({
+                        "ok": true,
+                        "path": path.to_string_lossy(),
+                        "extracted": true,
+                        "bytes": text.len(),
+                        "text": text,
+                    }));
+                } else {
+                    println!("{text}");
+                }
                 return ExitCode::SUCCESS;
             }
             Ok(None) => {}
             Err(e) => {
-                eprintln!("poler view: text extraction error: {e}");
+                if as_json {
+                    println!("{}", json!({"ok": false, "error_code": "extraction_error", "error": format!("text extraction error: {e}")}));
+                } else {
+                    eprintln!("poler view: text extraction error: {e}");
+                }
                 return ExitCode::from(1);
             }
         }
@@ -437,6 +474,22 @@ fn run_view_cli(args: &[String]) -> ExitCode {
     if poler_cli::core::vfs::is_vfs_container(&path) {
         match poler_cli::core::vfs::vfs_list(&path) {
             Ok((kind, entries)) => {
+                if as_json {
+                    let list: Vec<serde_json::Value> = entries.iter().map(|e| json!({
+                        "name": e.name,
+                        "size": e.size,
+                        "compressed": e.compressed,
+                        "is_dir": e.is_dir,
+                    })).collect();
+                    println!("{}", json!({
+                        "ok": true,
+                        "kind": format!("{kind:?}"),
+                        "path": path.to_string_lossy(),
+                        "total_entries": entries.len(),
+                        "entries": list,
+                    }));
+                    return ExitCode::SUCCESS;
+                }
                 println!("{kind:?} container: {} (total entries: {})", path.display(), entries.len());
                 for e in entries.iter().take(50) {
                     let d = if e.is_dir { "/" } else { "" };
@@ -448,17 +501,20 @@ fn run_view_cli(args: &[String]) -> ExitCode {
                 return ExitCode::SUCCESS;
             }
             Err(e) => {
-                eprintln!("poler view: archive listing error: {e}");
+                if as_json {
+                    println!("{}", json!({"ok": false, "error_code": "archive_listing_error", "error": format!("archive listing error: {e}")}));
+                } else {
+                    eprintln!("poler view: archive listing error: {e}");
+                }
                 return ExitCode::from(1);
             }
         }
     }
 
-    // Иначе открываем через Piece-Table mmap2 (работает хоть на 40 ГБ файлах)
+    // Otherwise open via Piece-Table mmap2
     match poler_cli::core::buffer::PolerBuffer::open(&path) {
         Ok(mut b) => {
             let total_len = b.total_len();
-            // По умолчанию читаем первые 50 строк
             let mut line = 0u64;
             let mut count = 50usize;
             if let Some(pos) = args.iter().position(|a| a == "--lines") {
@@ -472,20 +528,40 @@ fn run_view_cli(args: &[String]) -> ExitCode {
             }
             match b.read_span(line, count, 4 << 20) {
                 Ok(span) => {
-                    print!("{}", span.text);
-                    if span.byte_capped {
-                        eprintln!("\n[poler view: output capped at 4 MiB, total size: {} bytes]", total_len);
+                    if as_json {
+                        println!("{}", json!({
+                            "ok": true,
+                            "path": path.to_string_lossy(),
+                            "total_bytes": total_len,
+                            "start_line": line,
+                            "count": count,
+                            "byte_capped": span.byte_capped,
+                            "text": span.text,
+                        }));
+                    } else {
+                        print!("{}", span.text);
+                        if span.byte_capped {
+                            eprintln!("\n[poler view: output capped at 4 MiB, total size: {} bytes]", total_len);
+                        }
                     }
                     ExitCode::SUCCESS
                 }
                 Err(e) => {
-                    eprintln!("poler view: read error: {e}");
+                    if as_json {
+                        println!("{}", json!({"ok": false, "error_code": "read_error", "error": format!("read error: {e}")}));
+                    } else {
+                        eprintln!("poler view: read error: {e}");
+                    }
                     ExitCode::from(1)
                 }
             }
         }
         Err(e) => {
-            eprintln!("poler view: open error: {e}");
+            if as_json {
+                println!("{}", json!({"ok": false, "error_code": "open_error", "error": format!("open error: {e}")}));
+            } else {
+                eprintln!("poler view: open error: {e}");
+            }
             ExitCode::from(1)
         }
     }
@@ -493,7 +569,7 @@ fn run_view_cli(args: &[String]) -> ExitCode {
 
 fn run_patch_cli(args: &[String]) -> ExitCode {
     if args.len() < 3 {
-        eprintln!("Usage: poler patch <PATH[::ENTRY]> <OLD_TEXT> <NEW_TEXT> [--entry <ENTRY>]");
+        eprintln!("Usage: poler patch <PATH[::ENTRY]> <OLD_TEXT> <NEW_TEXT> [--entry <ENTRY>] [--dry-run|--diff] [--json]");
         return ExitCode::from(2);
     }
     let target_spec = &args[0];
@@ -501,15 +577,41 @@ fn run_patch_cli(args: &[String]) -> ExitCode {
     let new_text = &args[2];
 
     let mut entry_override: Option<String> = None;
+    let mut dry_run = false;
+    let mut as_json = false;
     let mut i = 3;
     while i < args.len() {
-        if (args[i] == "--entry" || args[i] == "-e") && i + 1 < args.len() {
-            entry_override = Some(args[i + 1].clone());
-            i += 2;
-        } else {
-            i += 1;
+        match args[i].as_str() {
+            "--entry" | "-e" => {
+                if i + 1 < args.len() {
+                    entry_override = Some(args[i + 1].clone());
+                    i += 2;
+                    continue;
+                }
+            }
+            "--dry-run" | "--diff" => {
+                dry_run = true;
+            }
+            "--json" => {
+                as_json = true;
+            }
+            _ => {}
         }
+        i += 1;
     }
+
+    let report_err = |code_str: &str, exit_code: u8, msg: &str| -> ExitCode {
+        if as_json {
+            println!("{}", json!({
+                "ok": false,
+                "error_code": code_str,
+                "error": msg,
+            }));
+        } else {
+            eprintln!("poler patch: {msg}");
+        }
+        ExitCode::from(exit_code)
+    };
 
     let (path, entry_from_spec) = if let Some((p, e)) = target_spec.split_once("::") {
         (PathBuf::from(p), Some(e.to_string()))
@@ -520,8 +622,7 @@ fn run_patch_cli(args: &[String]) -> ExitCode {
     let target_entry = entry_override.or(entry_from_spec);
 
     if !path.exists() {
-        eprintln!("poler patch: file not found: {}", path.display());
-        return ExitCode::from(2);
+        return report_err("file_not_found", 3, &format!("file not found: {}", path.display()));
     }
 
     // If VFS container (.zip, .docx, .epub, .odt, .jar, .tar, .poler, etc.) —
@@ -544,20 +645,19 @@ fn run_patch_cli(args: &[String]) -> ExitCode {
                             }
                         }
                         if candidates.is_empty() {
-                            eprintln!("poler patch: pattern {:?} not found in any entry of archive {}", old_text, path.display());
-                            return ExitCode::from(1);
+                            return report_err("match_not_found", 3, &format!("pattern {:?} not found in any entry of archive {}", old_text, path.display()));
                         } else if candidates.len() == 1 {
                             let chosen = candidates.remove(0);
-                            eprintln!("poler patch: auto-detected target entry '{}' in archive {}", chosen, path.display());
+                            if !as_json {
+                                eprintln!("poler patch: auto-detected target entry '{}' in archive {}", chosen, path.display());
+                            }
                             chosen
                         } else {
-                            eprintln!("poler patch: pattern found in multiple entries: {:?}. Specify target entry: poler patch {}::<ENTRY> {:?} {:?}", candidates, path.display(), old_text, new_text);
-                            return ExitCode::from(1);
+                            return report_err("ambiguous_match", 4, &format!("pattern found in multiple entries: {:?}. Specify target entry: poler patch {}::<ENTRY> {:?} {:?}", candidates, path.display(), old_text, new_text));
                         }
                     }
                     Err(e) => {
-                        eprintln!("poler patch: container read error for {}: {e}", path.display());
-                        return ExitCode::from(1);
+                        return report_err("container_read_error", 1, &format!("container read error for {}: {e}", path.display()));
                     }
                 }
             }
@@ -567,65 +667,146 @@ fn run_patch_cli(args: &[String]) -> ExitCode {
         let bytes = match poler_cli::core::vfs::vfs_read(&path, &entry_name, poler_cli::core::vfs::DEFAULT_MAX_ENTRY_BYTES) {
             Ok(b) => b,
             Err(e) => {
-                eprintln!("poler patch: failed to read entry '{entry_name}': {e}");
-                return ExitCode::from(1);
+                return report_err("entry_not_found", 3, &format!("failed to read entry '{entry_name}': {e}"));
             }
         };
 
-        let text = match String::from_utf8(bytes) {
+        if std::str::from_utf8(&bytes).is_err() {
+            return report_err("binary_entry", 1, &format!("entry '{entry_name}' contains binary data, text patching not supported"));
+        }
+
+        let mut tmp = match tempfile::NamedTempFile::new() {
             Ok(t) => t,
-            Err(_) => {
-                eprintln!("poler patch: entry '{entry_name}' contains binary data, text patching not supported");
-                return ExitCode::from(1);
-            }
+            Err(e) => return report_err("io_error", 1, &format!("failed to create temp file: {e}")),
         };
-
-        let virtual_path = PathBuf::from(format!("vfs://{}::{}", path.display(), entry_name));
-        let mut buf = poler_cli::core::buffer::PolerBuffer::from_text(virtual_path, &text);
+        use std::io::Write as _;
+        if let Err(e) = tmp.write_all(&bytes) {
+            return report_err("io_error", 1, &format!("failed to write temp file: {e}"));
+        }
+        if let Err(e) = tmp.flush() {
+            return report_err("io_error", 1, &format!("failed to flush temp file: {e}"));
+        }
+        let mut buf = match poler_cli::core::buffer::PolerBuffer::open(tmp.path()) {
+            Ok(mut b) => {
+                let disp = format!("{}::{}", path.display(), entry_name);
+                b.set_path(std::path::Path::new(&disp));
+                b
+            }
+            Err(e) => return report_err("open_error", 1, &format!("failed to mmap container entry: {e}")),
+        };
         match buf.replace_match(old_text, new_text, None, None, false, true) {
             Ok(_) => {
-                let new_bytes = buf.read_range(0, buf.total_len() as usize);
-                let mut ov = poler_cli::core::vfs_edit::VfsOverlay::default();
-                ov.write(&entry_name, new_bytes);
-                match poler_cli::core::vfs_edit::flush_archive(&path, &ov, &path, poler_cli::core::vfs_edit::DEFAULT_MAX_WRITE_BYTES) {
-                    Ok(stats) => {
-                        eprintln!("poler patch: successfully patched entry '{}' in archive ({} bytes)", entry_name, stats.bytes);
-                        ExitCode::SUCCESS
+                if dry_run {
+                    let diff = buf.piece_diff(3).unwrap_or_default();
+                    if as_json {
+                        println!("{}", json!({
+                            "ok": true,
+                            "path": path.to_string_lossy(),
+                            "entry": entry_name,
+                            "dry_run": true,
+                            "diff": diff,
+                        }));
+                    } else {
+                        print!("{diff}");
                     }
-                    Err(e) => {
-                        eprintln!("poler patch: failed to rebuild archive: {e}");
-                        ExitCode::from(1)
+                    ExitCode::SUCCESS
+                } else {
+                    let new_bytes = buf.read_range(0, buf.total_len() as usize);
+                    let mut ov = poler_cli::core::vfs_edit::VfsOverlay::default();
+                    ov.write(&entry_name, new_bytes);
+                    match poler_cli::core::vfs_edit::flush_archive(&path, &ov, &path, poler_cli::core::vfs_edit::DEFAULT_MAX_WRITE_BYTES) {
+                        Ok(stats) => {
+                            if as_json {
+                                println!("{}", json!({
+                                    "ok": true,
+                                    "path": path.to_string_lossy(),
+                                    "entry": entry_name,
+                                    "bytes": stats.bytes,
+                                    "dry_run": false,
+                                }));
+                            } else {
+                                eprintln!("poler patch: successfully patched entry '{}' in archive ({} bytes)", entry_name, stats.bytes);
+                            }
+                            ExitCode::SUCCESS
+                        }
+                        Err(e) => {
+                            report_err("archive_rebuild_error", 1, &format!("failed to rebuild archive: {e}"))
+                        }
                     }
                 }
             }
             Err(e) => {
-                eprintln!("poler patch: replacement failed: {e}");
-                ExitCode::from(1)
+                let (code, ec) = if e.starts_with("match_not_found:") {
+                    ("match_not_found", 3)
+                } else if e.starts_with("ambiguous_match:") {
+                    ("ambiguous_match", 4)
+                } else if e.starts_with("trit_syntax_broken:") {
+                    ("trit_syntax_broken", 5)
+                } else if e.starts_with("invalid_argument:") {
+                    ("invalid_argument", 2)
+                } else {
+                    ("replacement_failed", 1)
+                };
+                report_err(code, ec, &format!("replacement failed: {e}"))
             }
         }
     } else {
         match poler_cli::core::buffer::PolerBuffer::open(&path) {
             Ok(mut b) => {
                 match b.replace_match(old_text, new_text, None, None, false, true) {
-                    Ok(_) => match b.save() {
-                        Ok(bytes) => {
-                            eprintln!("poler patch: successfully patched ({} bytes)", bytes);
+                    Ok(_) => {
+                        if dry_run {
+                            let diff = b.piece_diff(3).unwrap_or_default();
+                            if as_json {
+                                println!("{}", json!({
+                                    "ok": true,
+                                    "path": path.to_string_lossy(),
+                                    "dry_run": true,
+                                    "diff": diff,
+                                }));
+                            } else {
+                                print!("{diff}");
+                            }
                             ExitCode::SUCCESS
+                        } else {
+                            match b.save() {
+                                Ok(bytes) => {
+                                    if as_json {
+                                        println!("{}", json!({
+                                            "ok": true,
+                                            "path": path.to_string_lossy(),
+                                            "bytes": bytes,
+                                            "dry_run": false,
+                                        }));
+                                    } else {
+                                        eprintln!("poler patch: successfully patched ({} bytes)", bytes);
+                                    }
+                                    ExitCode::SUCCESS
+                                }
+                                Err(e) => {
+                                    report_err("save_error", 1, &format!("save error: {e}"))
+                                }
+                            }
                         }
-                        Err(e) => {
-                            eprintln!("poler patch: save error: {e}");
-                            ExitCode::from(1)
-                        }
-                    },
+                    }
                     Err(e) => {
-                        eprintln!("poler patch: replacement failed: {e}");
-                        ExitCode::from(1)
+                        let (code, ec) = if e.starts_with("match_not_found:") {
+                            ("match_not_found", 3)
+                        } else if e.starts_with("ambiguous_match:") {
+                            ("ambiguous_match", 4)
+                        } else if e.starts_with("trit_syntax_broken:") {
+                            ("trit_syntax_broken", 5)
+                        } else if e.starts_with("invalid_argument:") {
+                            ("invalid_argument", 2)
+                        } else {
+                            ("replacement_failed", 1)
+                        };
+                        report_err(code, ec, &format!("replacement failed: {e}"))
                     }
                 }
             }
             Err(e) => {
-                eprintln!("poler patch: failed to open file: {e}");
-                ExitCode::from(1)
+                report_err("file_open_error", 1, &format!("failed to open file: {e}"))
             }
         }
     }
