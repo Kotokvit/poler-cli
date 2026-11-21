@@ -28,6 +28,11 @@ jobs:
         run: cargo build --verbose
       - name: Run tests
         run: cargo test --verbose
+      - name: Run live regression suites (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          python3 tests/test_patch_crc.py
+          python3 tests/test_ergonomics.py
 
   release:
     name: Release Asset (${{ matrix.asset_name }})

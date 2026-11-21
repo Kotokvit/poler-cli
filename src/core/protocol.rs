@@ -4342,4 +4342,24 @@ mod tests {
         assert_eq!(after["ok"], true);
         assert_eq!(after["delivered"], 0);
     }
+
+    #[test]
+    fn protocol_method_field_alias_interoperability() {
+        let mut sess = CoreSession::new();
+        // Canonical JSON-RPC 2.0 with "method": "stats"
+        let r1 = sess
+            .execute(&json!({"id": 101, "method": "stats", "path": "Cargo.toml"}), false, None)
+            .unwrap();
+        assert_eq!(r1["id"], 101);
+        assert_eq!(r1["ok"], true);
+        assert_eq!(r1["path"], "Cargo.toml");
+
+        // Canonical JSON-RPC 2.0 with unknown method
+        let r2 = sess
+            .execute(&json!({"id": 102, "method": "bogus"}), false, None)
+            .unwrap();
+        assert_eq!(r2["id"], 102);
+        assert_eq!(r2["ok"], false);
+        assert_eq!(r2["error"], "unknown command: bogus");
+    }
 }

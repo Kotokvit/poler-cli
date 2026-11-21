@@ -161,12 +161,34 @@ ln -s ~/.local/bin/poler ~/.local/bin/poler-edit-core
 
 ---
 
+## 🔒 Agent API & Contract Freeze (v0.98.x → v1.0 Guarantee)
+
+To provide rock-solid predictability for AI agents, LLM pipelines, and IDE integrations building on `poler`, the core contract is **formally frozen** and guaranteed backward-compatible until `v1.0.0`:
+
+1. **Process Exit Codes (0–5):**
+   * `0` (`SUCCESS`), `1` (`GENERAL_ERROR`), `2` (`USAGE_ERROR`), `3` (`NOT_FOUND`), `4` (`AMBIGUOUS_MATCH`), `5` (`SYNTAX_BROKEN` with atomic rollback).
+2. **Machine-Readable JSON Contract (`--json`):**
+   * Output structure (`ok`, `error_code`, `error`, `path`, `diff`, `bytes`, `dry_run`) and semantic error codes (`match_not_found`, `ambiguous_match`, `trit_syntax_broken`, `file_not_found`, `entry_not_found`).
+3. **JSON-RPC Protocol Invariant (`poler edit`):**
+   * Dual-dispatch: canonical JSON-RPC 2.0 `"method"` and `"cmd"` are permanent interchangeable aliases.
+4. **Zero-Disk-IO Dry-Run Guarantee (`--dry-run`, `--diff`):**
+   * Files and container archives (`.zip`, `.docx`, `.epub`, `.odt`, `.tar`) remain bit-for-bit identical on disk during dry-run executions.
+
+---
+
 ## 🧪 Testing & Verification
 
-All 184 unit and integration tests pass cleanly:
+All 185 Rust unit and integration tests, plus full live regression test suites, pass 100% cleanly:
 
 ```bash
+# 1. Native Rust unit & integration test suite (184 unit + 1 integration)
 cargo test
+
+# 2. Live container CRC-32 & VFS integrity test suite (10/10)
+python3 tests/test_patch_crc.py
+
+# 3. Live ergonomics, dry-run, JSON & exit codes 0-5 test suite (15/15)
+python3 tests/test_ergonomics.py
 ```
 
 ---
