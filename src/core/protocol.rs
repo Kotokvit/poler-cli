@@ -302,7 +302,7 @@ impl CoreSession {
         if let Some(&latest) = self.docs.map.keys().max() {
             return Ok(latest);
         }
-        Err("missing_doc_or_path: нет открытых вкладок и не указан path".to_string())
+        Err("missing_doc_or_path: no open documents and path not specified".to_string())
     }
 
     fn get_or_build_graph(&mut self, root: &Path, force_rebuild: bool) -> &TritProjectGraph {
@@ -331,7 +331,7 @@ impl CoreSession {
         gui_tx: Option<&mpsc::Sender<String>>,
     ) -> Option<Value> {
         let id = v.get("id").and_then(|x| x.as_u64()).unwrap_or(0);
-        let cmd = v.get("cmd").and_then(|x| x.as_str()).unwrap_or("");
+        let cmd = v.get("cmd").or_else(|| v.get("method")).and_then(|x| x.as_str()).unwrap_or("");
 
         if cmd == "quit" {
             if from_agent {
@@ -1251,7 +1251,7 @@ impl CoreSession {
                                 })
                             }
                             Err(_) => json!({"id": id, "ok": false, "error":
-                                format!("vfs_open: записи {norm} — бінарні дані (не UTF-8), редактор приймає лише текст")}),
+                                format!("vfs_open: entry '{norm}' contains binary data (non UTF-8), editor accepts text only")}),
                         },
                         Err(e) => json!({"id": id, "ok": false, "error": e}),
                     }
@@ -1314,7 +1314,7 @@ impl CoreSession {
                 let n = bytes.len();
                 if n as u64 > crate::vfs_edit::DEFAULT_MAX_WRITE_BYTES {
                     return Some(json!({"id": id, "ok": false, "error":
-                        format!("vfs_write: {n} байт > ліміту {} байт", crate::vfs_edit::DEFAULT_MAX_WRITE_BYTES)}));
+                        format!("vfs_write: {n} bytes > limit {} bytes", crate::vfs_edit::DEFAULT_MAX_WRITE_BYTES)}));
                 }
                 let key = normalize_path_key(&p);
                 let ov = self.vfs_overlays.entry(key).or_default();
@@ -1330,10 +1330,10 @@ impl CoreSession {
             "vfs_delete" => {
                 // Пометить запись удалённой в оверлее (материализация — flush).
                 let Some(p) = req_path(v) else {
-                    return Some(json!({"id": id, "ok": false, "error": "vfs_delete: поле path обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "vfs_delete: path field is required"}));
                 };
                 let Some(entry) = v.get("entry").and_then(|x| x.as_str()) else {
-                    return Some(json!({"id": id, "ok": false, "error": "vfs_delete: поле entry обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "vfs_delete: entry field is required"}));
                 };
                 let key = normalize_path_key(&p);
                 let ov = self.vfs_overlays.entry(key).or_default();
@@ -1349,7 +1349,7 @@ impl CoreSession {
             "vfs_dirty" => {
                 // Что изменено относительно диска: modified/added/deleted.
                 let Some(p) = req_path(v) else {
-                    return Some(json!({"id": id, "ok": false, "error": "vfs_dirty: поле path обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "vfs_dirty: path field is required"}));
                 };
                 let key = normalize_path_key(&p);
                 let entries = match self.vfs_overlays.get(&key) {
@@ -1468,7 +1468,7 @@ impl CoreSession {
                         Ok(m) if m.len() <= crate::vfs::DEFAULT_MAX_ENTRY_BYTES => {}
                         Ok(m) => {
                             return Some(json!({"id": id, "ok": false,
-                                "error": format!("symbol_bench: {} Б > ліміту {} Б", m.len(), crate::vfs::DEFAULT_MAX_ENTRY_BYTES)}))
+                                "error": format!("symbol_bench: {} B > limit {} B", m.len(), crate::vfs::DEFAULT_MAX_ENTRY_BYTES)}))
                         }
                         Err(e) => {
                             return Some(json!({"id": id, "ok": false,
@@ -1484,17 +1484,17 @@ impl CoreSession {
                     }
                 } else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "symbol_bench: нужно поле data_base64, text или path"}));
+                        "error": "symbol_bench: data_base64, text, or path field is required"}));
                 };
                 json!({
                     "id": id, "ok": false,
-                    "error": "Символьная фаза Shannon Bypass вынесена в суверенный poler-engine",
+                    "error": "Shannon Bypass symbolic phase is offloaded to sovereign poler-engine",
                 })
             }
             "vfs_discard" => {
                 // Откатить CoW-правки архива к состоянию на диске.
                 let Some(p) = req_path(v) else {
-                    return Some(json!({"id": id, "ok": false, "error": "vfs_discard: поле path обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "vfs_discard: path field is required"}));
                 };
                 let key = normalize_path_key(&p);
                 let discarded = self.vfs_overlays.remove(&key).is_some();
@@ -1523,7 +1523,7 @@ impl CoreSession {
                     })
                 else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "scratch_put: поле uri (или name) обязательно"}));
+                        "error": "scratch_put: uri (or name) field is required"}));
                 };
                 let data: Vec<u8> = if let Some(b64) = v.get("data_base64").and_then(|x| x.as_str()) {
                     match crate::vfs::base64_decode(b64) {
@@ -1537,7 +1537,7 @@ impl CoreSession {
                     text.as_bytes().to_vec()
                 } else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "scratch_put: нужно поле data_base64 или text"}));
+                        "error": "scratch_put: data_base64 or text field required"}));
                 };
                 let provenance = v.get("provenance").and_then(|x| x.as_str()).map(|s| s.to_string());
                 // База-источник: файл на диске либо запись смонтированного
@@ -1613,7 +1613,7 @@ impl CoreSession {
                     })
                 else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "scratch_get: поле uri (или name) обязательно"}));
+                        "error": "scratch_get: uri (or name) field is required"}));
                 };
                 let as_text = v.get("text").and_then(|x| x.as_bool()).unwrap_or(false);
                 match self.scratch.get(&name) {
@@ -1701,12 +1701,12 @@ impl CoreSession {
                         })
                     else {
                         return Some(json!({"id": id, "ok": false,
-                            "error": "scratch_discard: поле uri (или name), либо all: true"}));
+                            "error": "scratch_discard: uri (or name) field, or all: true is required"}));
                     };
                     match self.scratch.discard(&name) {
                         Ok(true) => json!({"id": id, "ok": true, "uri": name, "discarded": true}),
                         Ok(false) => json!({"id": id, "ok": false,
-                            "error": format!("scratch_discard: записи {name:?} нет в полигона")}),
+                            "error": format!("scratch_discard: entry {name:?} not found in scratchpad")}),
                         Err(e) => json!({"id": id, "ok": false, "error": e}),
                     }
                 }
@@ -1730,7 +1730,7 @@ impl CoreSession {
                     })
                 else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "scratch_apply: поле uri (или name) обязательно"}));
+                        "error": "scratch_apply: uri (or name) field is required"}));
                 };
                 let Some(target) = v
                     .get("target")
@@ -1739,7 +1739,7 @@ impl CoreSession {
                     .filter(|s| !s.is_empty())
                 else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "scratch_apply: поле target (путь файла или архива) обязательно"}));
+                        "error": "scratch_apply: target field (file or archive path) is required"}));
                 };
                 let data = match self.scratch.get(&name) {
                     Ok(d) => d,
@@ -1780,12 +1780,12 @@ impl CoreSession {
                 // Хеббовское укрепление синапса (+1, насыщение {−1,0,+1}).
                 let Some(text) = v.get("text").and_then(|x| x.as_str()) else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "crystal_note: поле text обязательно"}));
+                        "error": "crystal_note: text field is required"}));
                 };
                 let words = crate::crystal::tokenize(text);
                 if words.is_empty() {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "crystal_note: пустая заметка (нет слов)"}));
+                        "error": "crystal_note: empty note (no words found)"}));
                 }
                 let crystal = match self.crystal_mut() {
                     Ok(c) => c,
@@ -1826,7 +1826,7 @@ impl CoreSession {
                 // ±1 в обе стороны) — ассоциативная память агента.
                 let Some(word) = v.get("word").and_then(|x| x.as_str()) else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "crystal_assoc: поле word обязательно"}));
+                        "error": "crystal_assoc: word field is required"}));
                 };
                 let sem_k = v
                     .get("sem_k")
@@ -1925,7 +1925,7 @@ impl CoreSession {
                 // загрузчиком формата; повреждённый кристалл отвергается).
                 let Some(p) = req_path(v) else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "crystal_load: поле path обязательно"}));
+                        "error": "crystal_load: path field is required"}));
                 };
                 let dims = v
                     .get("dims")
@@ -1964,7 +1964,7 @@ impl CoreSession {
                 // сериализация + SHA-256 тела; файл 20 КБ – 2 МБ).
                 let Some(p) = req_path(v) else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "crystal_save: поле path обязательно"}));
+                        "error": "crystal_save: path field is required"}));
                 };
                 let crystal = match self.crystal_mut() {
                     Ok(c) => c,
@@ -2078,12 +2078,12 @@ impl CoreSession {
             "engine_search" => {
                 let Some(path) = req_path(v) else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "engine_search: поле path обязательно (файл или корень репозитория)"}));
+                        "error": "engine_search: path field is required (file or repository root)"}));
                 };
                 let Some(query) = v.get("query").and_then(|x| x.as_str())
                     .filter(|s| !s.trim().is_empty()) else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "engine_search: поле query обязательно"}));
+                        "error": "engine_search: query field is required"}));
                 };
                 let top = u64_of(v, "top").clamp(1, 20);
                 match self.engine_daemon_mut() {
@@ -2096,7 +2096,7 @@ impl CoreSession {
                             let is_err = r.get("is_error").and_then(|x| x.as_bool()).unwrap_or(false);
                             if is_err {
                                 let msg = r.get("text").and_then(|t| t.as_str())
-                                    .unwrap_or("ошибка поиска движка");
+                                    .unwrap_or("engine search error");
                                 json!({"id": id, "ok": false, "error": msg})
                             } else {
                                 let text = r.get("text").and_then(|t| t.as_str()).unwrap_or("");
@@ -2115,7 +2115,7 @@ impl CoreSession {
                 let Some(pattern) = v.get("pattern").and_then(|x| x.as_str())
                     .filter(|s| !s.is_empty()) else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "engine_grep: поле pattern обязательно"}));
+                        "error": "engine_grep: pattern field is required"}));
                 };
                 let path = v.get("path").and_then(|x| x.as_str())
                     .filter(|s| !s.trim().is_empty())
@@ -2165,7 +2165,7 @@ impl CoreSession {
             "engine_pack" => {
                 let Some(dir) = req_path(v).filter(|p| p.is_dir()) else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "engine_pack: поле path обязательно (каталог для упаковки в .poler)"}));
+                        "error": "engine_pack: path field is required (directory to pack into .poler)"}));
                 };
                 let out = match v.get("out").and_then(|x| x.as_str())
                     .filter(|s| !s.trim().is_empty()) {
@@ -2175,7 +2175,7 @@ impl CoreSession {
                 let gitignore = v.get("gitignore").and_then(|x| x.as_bool()).unwrap_or(false);
                 let jobs = u64_of(v, "jobs");
                 match crate::engine_gate::find_engine_bin() {
-                    None => json!({"id": id, "ok": false, "error": "poler-engine не найден"}),
+                    None => json!({"id": id, "ok": false, "error": "poler-engine not found in PATH or ~/.local/bin"}),
                     Some(bin) => match crate::engine_gate::pack_dir(&bin, &dir, &out, gitignore, jobs) {
                         Ok(stats) => json!({"id": id, "ok": true, "stats": stats}),
                         Err(e) => json!({"id": id, "ok": false, "error": e}),
@@ -2186,7 +2186,7 @@ impl CoreSession {
             "engine_squeeze" => {
                 let Some(file) = req_path(v).filter(|p| p.is_file()) else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "engine_squeeze: поле path обязательно (файл-контейнер: tar / tar.gz / tar.zst / gz / zst / ...)"}));
+                        "error": "engine_squeeze: path field is required (container file: tar / tar.gz / tar.zst / gz / zst / ...)"}));
                 };
                 let out = match v.get("out").and_then(|x| x.as_str())
                     .filter(|s| !s.trim().is_empty()) {
@@ -2194,7 +2194,7 @@ impl CoreSession {
                     None => file.with_extension("poler"),
                 };
                 match crate::engine_gate::find_engine_bin() {
-                    None => json!({"id": id, "ok": false, "error": "poler-engine не найден"}),
+                    None => json!({"id": id, "ok": false, "error": "poler-engine not found in PATH or ~/.local/bin"}),
                     Some(bin) => match crate::engine_gate::stream_file(&bin, &file, &out) {
                         Ok(stats) => json!({"id": id, "ok": true, "stats": stats}),
                         Err(e) => json!({"id": id, "ok": false, "error": e}),
@@ -2205,10 +2205,10 @@ impl CoreSession {
             "engine_archive_ls" => {
                 let Some(path) = req_path(v).filter(|p| p.is_file()) else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "engine_archive_ls: поле path обязательно (архив: .poler / .zip / .tar / .epub / ...)"}));
+                        "error": "engine_archive_ls: path field is required (archive: .poler / .zip / .tar / .epub / ...)"}));
                 };
                 match crate::engine_gate::find_engine_bin() {
-                    None => json!({"id": id, "ok": false, "error": "poler-engine не найден"}),
+                    None => json!({"id": id, "ok": false, "error": "poler-engine not found in PATH or ~/.local/bin"}),
                     Some(bin) => match crate::engine_gate::archive_list(&bin, &path) {
                         Ok(listing) => json!({"id": id, "ok": true, "listing": listing}),
                         Err(e) => json!({"id": id, "ok": false, "error": e}),
@@ -2219,16 +2219,16 @@ impl CoreSession {
             "engine_impact" => {
                 let Some(root) = req_path(v).filter(|p| p.is_dir()) else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "engine_impact: поле path обязательно (корень проекта для AIDDE call-graph)"}));
+                        "error": "engine_impact: path field is required (project root for AIDDE call-graph)"}));
                 };
                 let Some(symbol) = v.get("symbol").and_then(|x| x.as_str())
                     .filter(|s| !s.trim().is_empty()) else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "engine_impact: поле symbol обязательно (имя функции/структуры)"}));
+                        "error": "engine_impact: symbol field is required (function or struct name)"}));
                 };
                 let depth = u64_of(v, "depth");
                 match crate::engine_gate::find_engine_bin() {
-                    None => json!({"id": id, "ok": false, "error": "poler-engine не найден"}),
+                    None => json!({"id": id, "ok": false, "error": "poler-engine not found in PATH or ~/.local/bin"}),
                     Some(bin) => match crate::engine_gate::impact(&bin, &root, symbol, depth) {
                         Ok(imp) => json!({"id": id, "ok": true, "impact": imp}),
                         Err(e) => json!({"id": id, "ok": false, "error": e}),
@@ -2239,7 +2239,7 @@ impl CoreSession {
             "engine_crystal_ingest" => {
                 let Some(path) = req_path(v).filter(|p| p.exists()) else {
                     return Some(json!({"id": id, "ok": false,
-                        "error": "engine_crystal_ingest: поле path обязательно (каталог с текстами или .poler-архив)"}));
+                        "error": "engine_crystal_ingest: path field is required (text directory or .poler archive)"}));
                 };
                 let out = match v.get("out").and_then(|x| x.as_str())
                     .filter(|s| !s.trim().is_empty()) {
@@ -2248,7 +2248,7 @@ impl CoreSession {
                 };
                 let vocab = u64_of(v, "vocab");
                 match crate::engine_gate::find_engine_bin() {
-                    None => json!({"id": id, "ok": false, "error": "poler-engine не найден"}),
+                    None => json!({"id": id, "ok": false, "error": "poler-engine not found in PATH or ~/.local/bin"}),
                     Some(bin) => match crate::engine_gate::crystal_ingest(&bin, &path, &out, vocab) {
                         Ok(mut c) => {
                             c["id"] = json!(id);
@@ -2549,7 +2549,7 @@ impl CoreSession {
                         let Some(tx) = gui_tx.cloned() else {
                             return Some(json!({
                                 "id": id, "ok": false,
-                                "error": "search_live требует потокового канала событий (используйте search в stateless режиме)"
+                                "error": "search_live requires a streaming event channel (use search in stateless mode)"
                             }));
                         };
                         let total = b.total_len();
@@ -2609,7 +2609,7 @@ impl CoreSession {
                             "limit": limit, "total_bytes": total,
                         })
                     }
-                    None => json!({"id": id, "ok": false, "error": "нет такого doc"}),
+                    None => json!({"id": id, "ok": false, "error": "doc not found: no open document with this id"}),
                 }
             }
 
@@ -2627,7 +2627,7 @@ impl CoreSession {
                         "reason": info.reason,
                     })
                 }
-                None => json!({"id": id, "ok": false, "error": "license_activate: поле key обязательно"}),
+                None => json!({"id": id, "ok": false, "error": "license_activate: key field is required"}),
             },
 
             "index" => match self.resolve_or_open_doc(v) {
@@ -2752,7 +2752,7 @@ impl CoreSession {
 
             "save_as" => {
                 let Some(p) = req_path(v) else {
-                    return Some(json!({"id": id, "ok": false, "error": "save_as: поле path обязательно"}));
+                    return Some(json!({"id": id, "ok": false, "error": "save_as: path field is required"}));
                 };
                 let doc = doc_of(v);
                 match self.docs.map.get_mut(&doc) {
@@ -2790,7 +2790,7 @@ impl CoreSession {
                             }
                         }
                     }
-                    None => json!({"id": id, "ok": false, "error": "нет такого doc"}),
+                    None => json!({"id": id, "ok": false, "error": "doc not found: no open document with this id"}),
                 }
             }
 
@@ -2926,7 +2926,7 @@ impl CoreSession {
                         Err(e) => json!({
                             "id": id,
                             "ok": false,
-                            "error": format!("Ошибка вызова poler-engine: {e}"),
+                            "error": format!("Failed to invoke poler-engine: {e}"),
                             "duration_ms": t0.elapsed().as_millis() as u64,
                         }),
                     }
@@ -2934,7 +2934,7 @@ impl CoreSession {
                     json!({
                         "id": id,
                         "ok": false,
-                        "error": "Калькулятор вынесен в суверенный poler-engine. Установите poler-engine или используйте: poler-engine calc",
+                        "error": "Calculator is offloaded to sovereign poler-engine. Install poler-engine or use: poler-engine calc",
                         "duration_ms": t0.elapsed().as_millis() as u64,
                     })
                 }
@@ -2949,7 +2949,7 @@ impl CoreSession {
                 let role = v.get("role").and_then(|x| x.as_str()).unwrap_or("human").to_string();
                 if from_agent {
                     json!({"id": id, "ok": false,
-                        "error": "chat_broadcast: команда GUI (человека), не агента"})
+                        "error": "chat_broadcast: GUI (human) command, not for agents"})
                 } else if let Some(hub) = self.agent_hub.clone() {
                     let delivered = hub.broadcast(&json!({
                         "ev": "agent_chat", "role": role, "text": text
@@ -2957,14 +2957,14 @@ impl CoreSession {
                     json!({"id": id, "ok": true, "delivered": delivered})
                 } else {
                     json!({"id": id, "ok": false,
-                        "error": "listen-сокет не поднят (запустите ядро с --listen)"})
+                        "error": "listen socket is not running (start editor with --listen)"})
                 }
             }
             "chat_send" => {
                 let text = v.get("text").and_then(|x| x.as_str()).unwrap_or("").to_string();
                 if !from_agent {
                     json!({"id": id, "ok": false,
-                        "error": "chat_send: команда агента (TCP+token), для GUI есть chat_broadcast"})
+                        "error": "chat_send: agent command (TCP+token); for GUI use chat_broadcast"})
                 } else {
                     if let Some(tx) = gui_tx {
                         let _ = tx.send(
@@ -3194,7 +3194,7 @@ pub fn send_tcp_command(addr: &str, token: &str, mut cmd: Value) -> Result<Value
         .read_line(&mut line)
         .map_err(|e| format!("tcp_read: {e}"))?;
     if line.trim().is_empty() {
-        return Err("tcp_eof: пустой ответ от живого ядра".to_string());
+        return Err("tcp_eof: empty response from live engine".to_string());
     }
     serde_json::from_str(line.trim()).map_err(|e| format!("tcp_bad_json: {e}"))
 }
@@ -3306,7 +3306,7 @@ pub fn run_edit_server_with_listen(listen_addr: Option<&str>) -> i32 {
             }
         };
         let id = v.get("id").and_then(|x| x.as_u64()).unwrap_or(0);
-        let cmd = v.get("cmd").and_then(|x| x.as_str()).unwrap_or("");
+        let cmd = v.get("cmd").or_else(|| v.get("method")).and_then(|x| x.as_str()).unwrap_or("");
         if cmd == "cancel" {
             cancel_fast.store(true, Ordering::Relaxed);
             if let Ok(s) = sessions_fast.lock() {
@@ -3389,14 +3389,14 @@ fn handle_tcp_agent(
                 let _ = writeln!(
                     writer,
                     "{}",
-                    json!({"id": id, "ok": false, "error": "unauthorized: неверный POLER_EDIT_TOKEN"})
+                    json!({"id": id, "ok": false, "error": "unauthorized: invalid POLER_EDIT_TOKEN"})
                 );
                 let _ = writer.flush();
                 break;
             }
         }
         let (reply_tx, reply_rx) = mpsc::channel::<String>();
-        let is_quit = v.get("cmd").and_then(|x| x.as_str()) == Some("quit");
+        let is_quit = v.get("cmd").or_else(|| v.get("method")).and_then(|x| x.as_str()) == Some("quit");
         if tx_req
             .send(QueuedRequest {
                 req: v,

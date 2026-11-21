@@ -104,13 +104,14 @@ poler patch archive.zip::nested/doc.txt "old_token" "new_token" --dry-run
 | **`5`** | `SYNTAX_BROKEN` | `trit_syntax_broken` — balanced bracket/delimiter check failed in $GF(3)$. |
 
 ### 5. `poler edit` — Headless JSON-RPC Editor Server
-Starts the stdio JSON-RPC interface for editors, IDEs, and automation:
+Starts the stdio JSON-RPC interface for editors, IDEs, and AI automation (supports both `"cmd"` and canonical JSON-RPC 2.0 `"method"` fields interchangeably):
 ```bash
 # Inspect complete 71-command JSON schema
 poler edit --schema
 
-# One-shot command execution
+# One-shot command execution (supports both "cmd" and "method")
 poler edit --exec '{"cmd":"stats","path":"Cargo.toml"}'
+poler edit --exec '{"id":1,"method":"stats","path":"Cargo.toml"}'
 ```
 
 ### 6. `poler mcp` — Model Context Protocol Server

@@ -242,7 +242,7 @@ pub fn overlay_read(
         match ov.change(&norm) {
             Some(VfsChange::Deleted) => {
                 return Err(format!(
-                    "{}::{}: запис видалено (CoW-оверлей)",
+                    "{}::{}: entry deleted (CoW overlay)",
                     path.display(),
                     norm
                 ));
@@ -250,7 +250,7 @@ pub fn overlay_read(
             Some(VfsChange::Modified(data)) => {
                 if data.len() as u64 > max_entry_bytes {
                     return Err(format!(
-                        "{}::{}: розмір {} байт > ліміту {max_entry_bytes} байт",
+                        "{}::{}: size {} bytes exceeds limit {max_entry_bytes} bytes",
                         path.display(),
                         norm,
                         data.len()
@@ -290,7 +290,7 @@ fn flush_plan(src: &Path, ov: &VfsOverlay, max_entry_bytes: u64) -> Result<Vec<P
             Some(VfsChange::Modified(data)) => {
                 if data.len() as u64 > max_entry_bytes {
                     return Err(format!(
-                        "{}::{}: розмір {} байт > ліміту {max_entry_bytes} байт",
+                        "{}::{}: size {} bytes exceeds limit {max_entry_bytes} bytes",
                         src.display(),
                         e.name,
                         data.len()
@@ -316,7 +316,7 @@ fn flush_plan(src: &Path, ov: &VfsOverlay, max_entry_bytes: u64) -> Result<Vec<P
             if let Some(VfsChange::Modified(data)) = ov.change(&d.name) {
                 if data.len() as u64 > max_entry_bytes {
                     return Err(format!(
-                        "{}::{}: розмір {} байт > ліміту {max_entry_bytes} байт",
+                        "{}::{}: size {} bytes exceeds limit {max_entry_bytes} bytes",
                         src.display(),
                         d.name,
                         data.len()
@@ -378,14 +378,14 @@ pub fn flush_archive_opts(
         (Some(k), Some(_)) => k,
         (Some(_), None) => {
             return Err(format!(
-                "{}: не контейнер (zip/epub/tar/tar.gz/poler)",
+                "{}: not a recognized container (zip/epub/tar/tar.gz/poler)",
                 src.display()
             ))
         }
         (None, Some(k)) => k,
         (None, None) => {
             return Err(format!(
-                "{}: не контейнер (zip/epub/tar/tar.gz/poler)",
+                "{}: not a recognized container (zip/epub/tar/tar.gz/poler)",
                 src.display()
             ))
         }
@@ -468,7 +468,7 @@ fn flush_zip(
 ) -> Result<FlushStats, String> {
     let file = File::open(src).map_err(|e| format!("{}: {e}", src.display()))?;
     let mut reader = zip::ZipArchive::new(file)
-        .map_err(|e| format!("{}: некорректный zip: {e}", src.display()))?;
+        .map_err(|e| format!("{}: invalid zip archive: {e}", src.display()))?;
 
     let opts: zip::write::SimpleFileOptions = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
@@ -483,7 +483,7 @@ fn flush_zip(
             let (name, is_dir, encrypted) = {
                 let zf = reader
                     .by_index_raw(i)
-                    .map_err(|e| format!("{}: запись {i}: {e}", src.display()))?;
+                    .map_err(|e| format!("{}: entry {i}: {e}", src.display()))?;
                 (norm_name(zf.name()), zf.is_dir(), zf.encrypted())
             };
             match ov.change(&name) {
@@ -491,14 +491,14 @@ fn flush_zip(
                 Some(VfsChange::Modified(data)) => {
                     if encrypted {
                         return Err(format!(
-                            "{}::{}: шифрованную запись нельзя изменить (нет пароля)",
+                            "{}::{}: encrypted entry cannot be modified (no password provided)",
                             src.display(),
                             name
                         ));
                     }
                     if data.len() as u64 > max_entry_bytes {
                         return Err(format!(
-                            "{}::{}: розмір {} байт > ліміту {max_entry_bytes} байт",
+                            "{}::{}: size {} bytes exceeds limit {max_entry_bytes} bytes",
                             src.display(),
                             name,
                             data.len()
@@ -507,7 +507,7 @@ fn flush_zip(
                     total = total
                         .checked_add(data.len() as u64)
                         .filter(|t| *t <= MAX_FLUSH_TOTAL_BYTES)
-                        .ok_or_else(|| "пересборка: суммарный объём > 512 МиБ".to_string())?;
+                        .ok_or_else(|| "archive rebuild error: total uncompressed size exceeds 512 MiB".to_string())?;
                     if is_dir {
                         zw.add_directory(&name, opts)
                     } else {
@@ -524,7 +524,7 @@ fn flush_zip(
                     // сохраняются; рекомпрессии нет).
                     let zf = reader
                         .by_index_raw(i)
-                        .map_err(|e| format!("{}: запись {i}: {e}", src.display()))?;
+                        .map_err(|e| format!("{}: entry {i}: {e}", src.display()))?;
                     raw += zf.size();
                     zw.raw_copy_file(zf)
                         .map_err(|e| format!("zip raw copy {name}: {e}"))?;
@@ -545,7 +545,7 @@ fn flush_zip(
             };
             if data.len() as u64 > max_entry_bytes {
                 return Err(format!(
-                    "{}::{}: слишком большая новая запись",
+                    "{}::{}: new entry exceeds size limit",
                     src.display(),
                     d.name
                 ));
@@ -791,10 +791,10 @@ pub fn poler_write_to_method(
 
         while let Some((name, data)) = next_file()? {
             if name.len() > u16::MAX as usize {
-                return Err(format!("poler: имя записи слишком длинное ({name_len})", name_len = name.len()));
+                return Err(format!("poler: entry name is too long ({name_len})", name_len = name.len()));
             }
             if raw_pos + data.len() as u64 > MAX_FLUSH_TOTAL_BYTES {
-                return Err("poler: суммарный объём > 512 МиБ".to_string());
+                return Err("poler: total uncompressed size exceeds 512 MiB".to_string());
             }
             let file_raw_off = raw_pos;
             let mut file_sha = Sha256::new();

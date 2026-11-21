@@ -235,7 +235,7 @@ pub fn verify_snapshot_syntax(snap: &BufSnapshot, is_markdown: bool) -> SyntaxVe
                                     issues.push(SyntaxIssue {
                                         kind: "mismatched_bracket".into(),
                                         message: format!(
-                                            "ожидалась '{}', встречена '{}'",
+                                            "expected '{}', encountered '{}'",
                                             exp as char, b as char
                                         ),
                                         byte: global_off,
@@ -251,7 +251,7 @@ pub fn verify_snapshot_syntax(snap: &BufSnapshot, is_markdown: bool) -> SyntaxVe
                                     issues.push(SyntaxIssue {
                                         kind: "unexpected_close".into(),
                                         message: format!(
-                                            "лишняя закрывающая скобка '{}' (трит-баланс ушёл в -1)",
+                                            "unmatched closing delimiter '{}' (trit balance dipped to -1)",
                                             b as char
                                         ),
                                         byte: global_off,
@@ -298,7 +298,7 @@ pub fn verify_snapshot_syntax(snap: &BufSnapshot, is_markdown: bool) -> SyntaxVe
             let exp = matching_close(open) as char;
             issues.push(SyntaxIssue {
                 kind: "unclosed_open".into(),
-                message: format!("незакрытая скобка '{}', ожидается '{}'", open as char, exp),
+                message: format!("unclosed delimiter '{}', expected '{}'", open as char, exp),
                 byte: boff,
                 line: ln,
                 col,
