@@ -10,6 +10,26 @@
 
 ---
 
+## 🚀 Quick Install
+
+### 1-Line Universal Installer (Linux & macOS)
+```bash
+curl -fsSL https://raw.githubusercontent.com/Kotokvit/poler-cli/main/install.sh | bash
+```
+
+### Homebrew (macOS & Linux)
+```bash
+brew install Kotokvit/tap/poler
+```
+
+### Prebuilt Binaries & Cargo
+Prebuilt statically linked binaries for Linux (x86_64), macOS (Apple Silicon), and Windows are available on [GitHub Releases](https://github.com/Kotokvit/poler-cli/releases/tag/v0.100.0).
+```bash
+cargo install poler-cli
+```
+
+---
+
 ## ⚡ Key Highlights
 
 - **Zero-Copy Piece-Table Buffer ($O(1)$ RAM footprint):** Instantly opens and edits files of arbitrary size (tested on **40 GiB** files in milliseconds with < 100 KB metadata).
