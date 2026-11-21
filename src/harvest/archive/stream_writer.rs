@@ -1746,7 +1746,11 @@ mod tests {
     use super::*;
 
     fn tmp(name: &str) -> PathBuf {
-        let d = std::env::temp_dir().join(format!("poler-sw-{}", std::process::id()));
+        // Уникальный каталог на поток: модуль-близнец
+        // archive::stream_writer использует те же имена файлов,
+        // параллельные тесты гонялись за один путь (NotFound).
+        let tid = format!("{:?}", std::thread::current().id());
+        let d = std::env::temp_dir().join(format!("poler-sw-{}-{}", std::process::id(), tid));
         std::fs::create_dir_all(&d).unwrap();
         d.join(name)
     }
