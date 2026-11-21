@@ -1,6 +1,6 @@
 [package]
 name = "poler-cli"
-version = "0.98.2"
+version = "0.99.0"
 edition = "2021"
 authors = ["Kotokvit / POLER Engineering Core"]
 description = "Sovereign Ultra-Fast Filesystem Harvester, Grep, Zero-Copy Piece-Table Editor & AI-Agent MCP Engine"
@@ -40,6 +40,15 @@ tar = "0.4"
 zstd = "0.13"
 sha2 = "0.10"
 tempfile = "3"
+# unicode-segmentation — UAX#29 word boundaries для токенизатора chunk.rs
+# (порт web::extract::web_tokenize из poler-engine).
+unicode-segmentation = "1.11"
+# ureq — синхронный HTTP-клиент без tokio-runtime (fetch_remote в
+# archive/manifest_pack.rs: упаковка удалённых юнитов манифеста, как в poler-engine).
+ureq = { version = "2.10", features = ["json"] }
+# lz4_flex — чистый Rust, декомпрессия постингов на горячем пути
+# (compression/lz4_hot.rs, как в poler-engine).
+lz4_flex = "0.11"
 
 [dev-dependencies]
 tempfile = "3"
