@@ -969,12 +969,52 @@ fn meta_mtime_size(meta: &fs::Metadata) -> (i64, u32, u64) {
 
 /// Путь к квантовому хранилищу кристаллов (`.tar.poler`) рядом с горячим `.t5a`-кристаллом.
 fn crystal_vault_path(cpath: &Path) -> PathBuf {
-    cpath.to_path_buf()
+    cpath.with_extension("tar.poler")
 }
 
-/// Проверка наличия кэша `.t5a`.
+/// Гидратация `.t5a` из накопительного `.tar.poler`-архива, если горячий кэш удалён.
 fn hydrate_crystal_from_poler_vault(cpath: &Path) -> bool {
-    cpath.exists()
+    if cpath.exists() {
+        return true;
+    }
+    let vpath = crystal_vault_path(cpath);
+    if !vpath.exists() {
+        return false;
+    }
+    let Ok(reader) = crate::harvest::archive::reader::PolerReader::open(&vpath) else {
+        return false;
+    };
+    let Some(last_entry) = reader
+        .files()
+        .iter()
+        .rev()
+        .find(|f| f.name.ends_with(".t5a") && f.raw_len >= 64)
+    else {
+        return false;
+    };
+    let mut buf = Vec::with_capacity(last_entry.raw_len as usize);
+    if reader
+        .read_range(last_entry.raw_off, last_entry.raw_len as usize, &mut buf)
+        .is_err()
+    {
+        return false;
+    }
+    if let Some(parent) = cpath.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let tmp = cpath.with_extension("t5a.hydrate.tmp");
+    if fs::write(&tmp, &buf).is_ok() && fs::rename(&tmp, cpath).is_ok() {
+        if std::env::var_os("POLER_HARVEST_QUIET").is_none() {
+            eprintln!(
+                "poler_crystal_vault: hydrated {} from {} ({} KiB)",
+                last_entry.name,
+                vpath.display(),
+                buf.len() / 1024
+            );
+        }
+        return true;
+    }
+    false
 }
 
 /// Чтение файла-носителя по индексу `file_id` прямо из `mmap`-образа без аллокаций.
@@ -1438,15 +1478,13 @@ fn crystallize_harvest(
 
     // Собираем буфер с 512-байтным префиксом под POSIX ustar-заголовок и
     // выравниваем границы секций под точные точки разреза FastCDC (Shannon-Bypass дедуп).
-    
+
     let mut tar_buf: Vec<u8> = vec![0u8; 512 + 64];
     let mut chunk_start = 0usize;
     let as_bytes = |ptr: *const u8, len: usize| unsafe { std::slice::from_raw_parts(ptr, len) };
 
-    let rem = (tar_buf.len() - 512) % 8;
-    if rem != 0 {
-        tar_buf.extend_from_slice(&[0u8; 8][..8 - rem]);
-    }
+    let cdc = crate::harvest::archive::dedup::CdcParams::new(1024, 2048, 8192);
+    pad_to_exact_cdc_cut(&mut tar_buf, &mut chunk_start, &cdc);
     let anchors_off = (tar_buf.len() - 512) as u64;
     if !raw_anchors.is_empty() {
         tar_buf.extend_from_slice(as_bytes(
@@ -1455,19 +1493,13 @@ fn crystallize_harvest(
         ));
     }
 
-    let rem = (tar_buf.len() - 512) % 8;
-    if rem != 0 {
-        tar_buf.extend_from_slice(&[0u8; 8][..8 - rem]);
-    }
+    pad_to_exact_cdc_cut(&mut tar_buf, &mut chunk_start, &cdc);
     let mom_off = (tar_buf.len() - 512) as u64;
     if !raw_mom.is_empty() {
         tar_buf.extend_from_slice(as_bytes(raw_mom.as_ptr() as *const u8, raw_mom.len() * MOM_SLOT_STRIDE));
     }
 
-    let rem = (tar_buf.len() - 512) % 8;
-    if rem != 0 {
-        tar_buf.extend_from_slice(&[0u8; 8][..8 - rem]);
-    }
+    pad_to_exact_cdc_cut(&mut tar_buf, &mut chunk_start, &cdc);
     let queries_off = (tar_buf.len() - 512) as u64;
     if !raw_queries.is_empty() {
         tar_buf.extend_from_slice(as_bytes(
@@ -1485,10 +1517,7 @@ fn crystallize_harvest(
         tar_buf.extend_from_slice(&off.to_le_bytes());
     }
 
-    let rem = (tar_buf.len() - 512) % 8;
-    if rem != 0 {
-        tar_buf.extend_from_slice(&[0u8; 8][..8 - rem]);
-    }
+    pad_to_exact_cdc_cut(&mut tar_buf, &mut chunk_start, &cdc);
     let files_off = (tar_buf.len() - 512) as u64;
     for sf in &files_table {
         tar_buf.extend_from_slice(&sf.mtime_sec.to_le_bytes());
@@ -1501,10 +1530,7 @@ fn crystallize_harvest(
             tar_buf.extend_from_slice(&[0u8; 8][..8 - rem]);
         }
     }
-    let rem = (tar_buf.len() - 512) % 8;
-    if rem != 0 {
-        tar_buf.extend_from_slice(&[0u8; 8][..8 - rem]);
-    }
+    pad_to_exact_cdc_cut(&mut tar_buf, &mut chunk_start, &cdc);
 
     let t5a_len = tar_buf.len() - 512;
     let hdr = CrystalHeader {
@@ -1535,7 +1561,95 @@ fn crystallize_harvest(
     if tar_pad > 0 {
         tar_buf.resize(tar_buf.len() + tar_pad, 0);
     }
-    // .t5a сохранён напрямую
+    sync_crystal_to_poler_vault(cpath, query_key, t5a_len, &mut tar_buf, cdc);
+}
+
+#[inline]
+fn pad_to_exact_cdc_cut(
+    tar_buf: &mut Vec<u8>,
+    chunk_start: &mut usize,
+    cdc: &crate::harvest::archive::dedup::CdcParams,
+) {
+    crate::harvest::archive::dedup::pad_to_cdc_cut(tar_buf, chunk_start, cdc);
+}
+
+fn fill_ustar_header(hdr: &mut [u8], name: &str, size: usize) {
+    hdr[..512].fill(0);
+    let nb = name.as_bytes();
+    let nlen = nb.len().min(99);
+    hdr[..nlen].copy_from_slice(&nb[..nlen]);
+    hdr[100..107].copy_from_slice(b"0000644");
+    hdr[108..115].copy_from_slice(b"0000000");
+    hdr[116..123].copy_from_slice(b"0000000");
+    let sz_str = format!("{:011o}", size);
+    hdr[124..135].copy_from_slice(sz_str.as_bytes());
+    hdr[136..147].copy_from_slice(b"00000000000");
+    hdr[148..156].copy_from_slice(b"        ");
+    hdr[156] = b'0';
+    hdr[257..262].copy_from_slice(b"ustar");
+    hdr[263..265].copy_from_slice(b"00");
+    let cksum: u32 = hdr[..512].iter().map(|&b| b as u32).sum();
+    let ck_str = format!("{:06o}\0 ", cksum);
+    hdr[148..156].copy_from_slice(ck_str.as_bytes());
+}
+
+fn sync_crystal_to_poler_vault(
+    cpath: &Path,
+    query_key: u64,
+    t5a_len: usize,
+    tar_buf: &mut [u8],
+    cdc: crate::harvest::archive::dedup::CdcParams,
+) {
+    use crate::harvest::archive::stream_writer::{CompressTier, StreamWriteConfig, StreamWriter};
+
+    let vpath = crystal_vault_path(cpath);
+    let seq = if vpath.exists() {
+        crate::harvest::archive::reader::PolerReader::open(&vpath)
+            .map(|r| r.files().len() + 1)
+            .unwrap_or(1)
+    } else {
+        1
+    };
+    let entry_name = format!("crystal_{seq:06}_{query_key:016x}.t5a");
+    fill_ustar_header(&mut tar_buf[..512], &entry_name, t5a_len);
+
+    let cfg = StreamWriteConfig {
+        cdc,
+        dedup: true,
+        tier: CompressTier::Fast,
+        read_chunk: 64 * 1024,
+        progress_bytes: 0,
+        jobs: 0,
+        deep_level: 3,
+    };
+
+    let writer_res = if vpath.exists() {
+        StreamWriter::open_append(&vpath, cfg.clone()).or_else(|_| StreamWriter::open(&vpath, cfg))
+    } else {
+        StreamWriter::open(&vpath, cfg)
+    };
+    let Ok(mut writer) = writer_res else {
+        return;
+    };
+    if writer.push_bytes(tar_buf).is_err() {
+        return;
+    }
+    if let Ok(stats) = writer.finish(&entry_name) {
+        if std::env::var_os("POLER_HARVEST_QUIET").is_none() {
+            let file_bytes = fs::metadata(&vpath).map(|m| m.len()).unwrap_or(stats.total_stored);
+            let file_ratio = stats.total_raw as f64 / file_bytes.max(1) as f64;
+            eprintln!(
+                "poler_crystal_vault: crystals={} raw={} KiB -> .tar.poler={} KiB (compression={:.2}x, residue={:.1}%, dedup={} chunks / {} KiB)",
+                stats.files,
+                stats.total_raw / 1024,
+                file_bytes / 1024,
+                file_ratio,
+                stats.ratio * 100.0,
+                stats.dedup_chunks,
+                stats.dedup_bytes / 1024
+            );
+        }
+    }
 }
 
 /// Публичная точка входа: скан (или мгновенная `mmap`-проекция Кристалла Адресов) → ранжирование → агрегация.
