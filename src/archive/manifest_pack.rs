@@ -448,7 +448,7 @@ fn append_units_done(out: &Path, keys: &[String]) -> io::Result<()> {
 /// Имя записи в таблице файлов: для URL — базовое имя пути; для локального
 /// юнита — путь как написан в манифесте (обычно относительный).
 /// Абсолютные пути УКОРЕНЯЮТСЯ (tar-крейт отвергает записи с ведущим '/'
-/// — «paths in archives must be relative»), обратные слэши нормализуются.
+/// или Windows drive letter — «paths in archives must be relative»), обратные слэши нормализуются.
 fn unit_entry_name(key: &str) -> String {
     let name = if key.starts_with("http://") || key.starts_with("https://") {
         let no_frag = key.split('#').next().unwrap_or(key);
@@ -459,7 +459,13 @@ fn unit_entry_name(key: &str) -> String {
             .unwrap_or("unit")
             .to_string()
     } else {
-        key.replace('\\', "/").trim_start_matches('/').to_string()
+        let s = key.replace('\\', "/");
+        let s = if s.len() >= 2 && s.as_bytes()[1] == b':' && s.as_bytes()[0].is_ascii_alphabetic() {
+            &s[2..]
+        } else {
+            &s[..]
+        };
+        s.trim_start_matches('/').to_string()
     };
     if name.is_empty() {
         "unit".to_string()
@@ -802,9 +808,13 @@ mod tests {
     use super::*;
     use crate::archive::reader::PolerReader;
 
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static MANI_TEST_CTR: AtomicU64 = AtomicU64::new(1);
+
     fn tmp(name: &str) -> PathBuf {
+        let seq = MANI_TEST_CTR.fetch_add(1, Ordering::Relaxed);
         let d = std::env::temp_dir()
-            .join(format!("poler-mani-{}", std::process::id()))
+            .join(format!("poler-mani-{}-{}", std::process::id(), seq))
             .join(name);
         std::fs::create_dir_all(&d).unwrap();
         d
