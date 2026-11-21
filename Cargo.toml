@@ -49,6 +49,8 @@ ureq = { version = "2.10", features = ["json"] }
 # lz4_flex — чистый Rust, декомпрессия постингов на горячем пути
 # (compression/lz4_hot.rs, как в poler-engine).
 lz4_flex = "0.11"
+# petgraph — DiGraph для K-hop графа сущностей (graph/entity_graph.rs, как в poler-engine)
+petgraph = { version = "0.6", features = ["serde-1"] }
 
 [dev-dependencies]
 tempfile = "3"

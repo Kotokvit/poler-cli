@@ -5,10 +5,17 @@
 //! streaming, binfmt, psi, poler) собран здесь без опасных модулей
 //! (calc / crypto / exec / shell остались в закрытом движке).
 
+pub mod aidde;
 pub mod archive;
+pub mod asm;
+pub mod asm_compat;
 pub mod binfmt;
+pub mod calc;
 pub mod compression;
 pub mod core;
+pub mod engine;
+pub mod graph;
+pub mod output;
 pub mod harvest;
 pub mod intent;
 pub mod mcp;
@@ -25,6 +32,7 @@ pub use crate::core::{
     pdf_edit, protocol, scratch, search, trit_silicon, trit_syntax, universal_letters, vfs,
     vfs_edit,
 };
+pub use output::{render_markdown, render_simple, ContextAnchor, SearchResult};
 pub use tokenizer::{InvertedIndex, PiiCleaner, PiiMode};
 
 /// Мусорные каталоги, пропускаемые обходом даже без .gitignore
@@ -122,6 +130,18 @@ impl Default for EngineConfig {
             intent_mode: crate::intent::IntentMode::Auto,
         }
     }
+}
+
+/// Статистика прогона (для `--verbose`; порт из poler-engine).
+#[derive(Debug, Clone, Default)]
+pub struct ScanStats {
+    pub files_scanned: usize,
+    pub files_with_hits: usize,
+    pub total_tokens: u64,
+    pub total_hits: usize,
+    pub graph_nodes: usize,
+    pub graph_edges: usize,
+    pub elapsed_ms: u128,
 }
 
 /// Открывает файл через mmap и вызывает `f(text)` (порт из poler-engine).
