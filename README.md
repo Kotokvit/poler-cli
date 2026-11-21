@@ -2,7 +2,7 @@
 
 [![Rust CI](https://github.com/Kotokvit/poler-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/Kotokvit/poler-cli/actions/workflows/ci.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/Kotokvit/poler-cli?color=blue)](https://github.com/Kotokvit/poler-cli/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License: POLER Source-Available 1.0](https://img.shields.io/badge/License-POLER--1.0%20Source--Available-blue.svg)](LICENSE)
 
 > **Sovereign Ultra-Fast Filesystem Harvester, Parallel Grep, Zero-Copy Piece-Table Editor & AI-Agent MCP Engine.**
 
@@ -215,6 +215,10 @@ For commercial licensing (closed-source embedding, custom engine pipelines, high
 
 ---
 
-## 📄 License
+## ⚖️ Лицензия и условия использования / License
 
-Licensed under the MIT License or Apache-2.0 License.
+Проект распространяется под лицензией **POLER Custom Source-Available & Modification Disclosure License Version 1.0** (см. полный текст [`LICENSE`](LICENSE) и практическое руководство [`TERMS.md`](TERMS.md)).
+
+* 🔍 **Открытый исходный код (Source-Available):** Полная свобода изучения, аудита безопасности, локальной компиляции, бенчмаркинга и персонального использования.
+* 🛡️ **Защита от закрытых форков (Anti-Silent-Forking):** Включение ядра или модификаций в сторонние коммерческие продукты и платформы требует обязательного уведомления правообладателя (`vitalijkotok18@gmail.com` или через Issue в репозитории) в течение 14 дней с момента первого релиза/деплоя.
+* 💎 **Бесплатно для сообщества:** Личное использование, независимые исследования и интеграции внутри открытых инструментов — абсолютно бесплатны. Роялти 5% действует исключительно при валовой выручке коммерческого продукта свыше **$25 000 в квартал** (с безопасной гаванью до $10 000).
