@@ -64,6 +64,10 @@ hyperfine --warmup 2 \
 | **`ripgrep` (v14+)** | Linear Scan (re-traversing FS on every run) | **150.3 ms** | **242.8 ms** | 100% (raw verbose text) | ❌ Find-only |
 | **`poler harvest`** | **L1–L3 Address Crystal (`.t5a`)** | **6.7 ms** (⚡ **22× faster**) | **2.1 ms** (⚡ **115× faster**) | **-95%** (16-byte anchors) | ✅ Native Piece-Table |
 
+<p align="center">
+  <img src="assets/demo.gif" alt="Poler in Action — ripgrep vs poler harvest" width="100%">
+</p>
+
 ![Poler vs Ripgrep Head-to-Head Battle](assets/battle_benchmark.png)
 
 👉 **Read the full architectural whitepaper:** [BENCHMARKS.md](BENCHMARKS.md)
