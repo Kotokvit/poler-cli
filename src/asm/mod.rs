@@ -40,23 +40,6 @@
 // (fep_asm остался в poler-engine/harvest: cli-скану нужен только lens)
 #[cfg(target_arch = "x86_64")]
 pub mod lens_asm;
-#[cfg(target_arch = "x86_64")]
-// (не перенесено из poler-engine: нужно только трит-спектроскопии ε-ранга)
-#[cfg(target_arch = "x86_64")]
-// (не перенесено из poler-engine: нужно только трит-спектроскопии ε-ранга)
-#[cfg(target_arch = "x86_64")]
-// (не перенесено из poler-engine: нужно только трит-спектроскопии ε-ранга)
-#[cfg(target_arch = "x86_64")]
-// (не перенесено из poler-engine: нужно только трит-спектроскопии ε-ранга)
-#[cfg(target_arch = "x86_64")]
-// (cordic_asm остался в poler-engine/harvest: cli-скану нужен только lens)
-// (qutrit_asm остался в poler-engine/harvest: cli-скану нужен только lens)
-// (stdp_asm остался в poler-engine/harvest: cli-скану нужен только lens)
-// (synapse_asm остался в poler-engine/harvest: cli-скану нужен только lens)
-// (synapse_trit_asm остался в poler-engine/harvest: cli-скану нужен только lens)
-// (trit_asm остался в poler-engine/harvest: cli-скану нужен только lens)
-#[cfg(target_arch = "x86_64")]
-// (zero_asm остался в poler-engine/harvest: cli-скану нужен только lens)
 
 use std::sync::OnceLock;
 
@@ -78,6 +61,7 @@ pub struct AsmCaps {
 }
 
 impl AsmCaps {
+    #[cfg(target_arch = "x86_64")]
     fn detect() -> Self {
         Self {
             avx2: is_x86_feature_detected!("avx2"),
@@ -89,6 +73,21 @@ impl AsmCaps {
             avx: is_x86_feature_detected!("avx"),
             ssse3: is_x86_feature_detected!("ssse3"),
             sse41: is_x86_feature_detected!("sse4.1"),
+        }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    fn detect() -> Self {
+        Self {
+            avx2: false,
+            fma: false,
+            f16c: false,
+            popcnt: false,
+            avx512f: false,
+            sse2: false,
+            avx: false,
+            ssse3: false,
+            sse41: false,
         }
     }
 

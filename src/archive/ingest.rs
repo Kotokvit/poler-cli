@@ -471,6 +471,11 @@ fn pack_dir_inner(
             if let Ok(c) = std::fs::canonicalize(p) {
                 return c;
             }
+            if let (Some(parent), Some(fname)) = (p.parent(), p.file_name()) {
+                if let Ok(cp) = std::fs::canonicalize(parent) {
+                    return cp.join(fname);
+                }
+            }
             // Файла ещё нет (например, финальный .poler до rename) —
             // лексическая нормализация от текущего каталога.
             let joined = if p.is_absolute() {
@@ -525,7 +530,7 @@ fn pack_dir_inner(
             let path = entry.path();
             // Свой вывод не пакуем (self-reference — см. граблю выше).
             let canon = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-            if self_outputs.iter().any(|p| *p == canon) {
+            if self_outputs.iter().any(|p| *p == canon || *p == path) {
                 continue;
             }
             let rel = path.strip_prefix(root).unwrap_or(path);

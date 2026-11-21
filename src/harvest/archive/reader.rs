@@ -656,9 +656,13 @@ fn file_sha256(path: &Path) -> Result<String, String> {
 mod tests {
     use super::super::stream_writer::{write_stream, StreamWriter, StreamWriteConfig};
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static RD_HRV_TEST_CTR: AtomicU64 = AtomicU64::new(1);
 
     fn tmp(name: &str) -> std::path::PathBuf {
-        let d = std::env::temp_dir().join(format!("poler-rd-{}", std::process::id()));
+        let seq = RD_HRV_TEST_CTR.fetch_add(1, Ordering::Relaxed);
+        let tid = format!("{:?}", std::thread::current().id());
+        let d = std::env::temp_dir().join(format!("poler-rd-hrv-{}-{}-{}", std::process::id(), tid, seq));
         std::fs::create_dir_all(&d).unwrap();
         d.join(name)
     }

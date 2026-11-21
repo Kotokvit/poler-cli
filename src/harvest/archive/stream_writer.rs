@@ -24,14 +24,30 @@ trait WinFileExt {
 #[cfg(windows)]
 impl WinFileExt for std::fs::File {
     fn read_exact_at(&self, mut buf: &mut [u8], mut offset: u64) -> std::io::Result<()> {
+        use std::io::{Seek, SeekFrom};
         use std::os::windows::fs::FileExt;
+        let mut file_ref = self;
+        let orig_pos = file_ref.seek(SeekFrom::Current(0)).ok();
         while !buf.is_empty() {
             match self.seek_read(buf, offset) {
-                Ok(0) => return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "failed to fill whole buffer")),
+                Ok(0) => {
+                    if let Some(pos) = orig_pos {
+                        let _ = file_ref.seek(SeekFrom::Start(pos));
+                    }
+                    return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "failed to fill whole buffer"));
+                }
                 Ok(n) => { buf = &mut buf[n..]; offset += n as u64; }
                 Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {}
-                Err(e) => return Err(e),
+                Err(e) => {
+                    if let Some(pos) = orig_pos {
+                        let _ = file_ref.seek(SeekFrom::Start(pos));
+                    }
+                    return Err(e);
+                }
             }
+        }
+        if let Some(pos) = orig_pos {
+            let _ = file_ref.seek(SeekFrom::Start(pos));
         }
         Ok(())
     }
@@ -716,11 +732,11 @@ fn tls_compress(raw: &[u8], tier: CompressTier, deep_level: i32) -> io::Result<(
 /// Потоковый писатель .poler-контейнера.
 pub struct StreamWriter {
     cfg: StreamWriteConfig,
-    file: File,
+    file: Option<File>,
     part_path: PathBuf,
     final_path: PathBuf,
     /// Sidecar файлой таблицы (только метаданные, не сырые данные).
-    files_spill: File,
+    files_spill: Option<File>,
     files_spill_path: PathBuf,
     files_count: u64,
     logical: Vec<LogicalEntry>,
@@ -774,10 +790,10 @@ impl StreamWriter {
         let deep_level = cfg.deep_level;
         Ok(StreamWriter {
             cfg,
-            file,
+            file: Some(file),
             part_path,
             final_path: out.to_path_buf(),
-            files_spill,
+            files_spill: Some(files_spill),
             files_spill_path,
             files_count: 0,
             logical: Vec::new(),
@@ -946,10 +962,10 @@ impl StreamWriter {
         let deep_level = cfg.deep_level;
         Ok(StreamWriter {
             cfg,
-            file,
+            file: Some(file),
             part_path: out.to_path_buf(), // rename(p, p) — no-op на Linux
             final_path: out.to_path_buf(),
-            files_spill,
+            files_spill: Some(files_spill),
             files_spill_path,
             files_count,
             logical,
@@ -1160,8 +1176,14 @@ impl StreamWriter {
         for e in &self.logical {
             index_buf.extend_from_slice(&e.to_bytes());
         }
-        self.file.write_all(&index_buf)?;
+        self.file.as_mut().unwrap().write_all(&index_buf)?;
         self.stored_pos += index_buf.len() as u64;
+
+        // Синхронизируем и закрываем files_spill ДО чтения и сноса
+        if let Some(spill) = self.files_spill.take() {
+            spill.sync_all()?;
+            drop(spill);
+        }
 
         // файловая таблица: длина sidecar известна ДО вливания
         let files_off = self.stored_pos;
@@ -1173,7 +1195,7 @@ impl StreamWriter {
             if n == 0 {
                 break;
             }
-            self.file.write_all(&copy_buf[..n])?;
+            self.file.as_mut().unwrap().write_all(&copy_buf[..n])?;
         }
         drop(spill_read);
         let _ = std::fs::remove_file(&self.files_spill_path);
@@ -1204,12 +1226,19 @@ impl StreamWriter {
         trailer[52..60].copy_from_slice(&self.raw_pos.to_le_bytes());
         trailer[60..68].copy_from_slice(&final_len.to_le_bytes());
         trailer[68..100].copy_from_slice(&stream_digest);
-        self.file.write_all(&trailer)?;
-        self.file.sync_all()?;
-        // дескриптор закроется в Drop: rename с открытым хендлом
-        // валиден на Linux
 
-        std::fs::rename(&self.part_path, &self.final_path)?;
+        let mut file = self.file.take().ok_or_else(|| {
+            io::Error::new(io::ErrorKind::Other, "file already closed")
+        })?;
+        file.write_all(&trailer)?;
+        file.sync_all()?;
+        drop(file);
+
+        if self.part_path != self.final_path {
+            #[cfg(windows)]
+            let _ = std::fs::remove_file(&self.final_path);
+            std::fs::rename(&self.part_path, &self.final_path)?;
+        }
         self.finished = true;
         // v0.92.0 STREAM-CORPUS: state-sidecar — запись восстановления
         // (непрерывный регион [index_off, final_len)) для open_append и
@@ -1302,7 +1331,7 @@ impl StreamWriter {
             let raw_off = off;
             off += raw_len as u64;
             if self.cfg.dedup {
-                if let Some(stored_off) = self.dedup.lookup(&hash, &self.file) {
+                if let Some(stored_off) = self.dedup.lookup(&hash, self.file.as_ref().unwrap()) {
                     self.dedup.record_hit();
                     self.dedup_chunks += 1;
                     self.dedup_bytes += raw_len as u64;
@@ -1369,8 +1398,9 @@ impl StreamWriter {
                     hdr[32..36].copy_from_slice(&plan.raw_len.to_le_bytes());
                     hdr[36..40].copy_from_slice(&(payload.len() as u32).to_le_bytes());
                     hdr[40] = *method;
-                    self.file.write_all(&hdr)?;
-                    self.file.write_all(payload)?;
+                    let f = self.file.as_mut().unwrap();
+                    f.write_all(&hdr)?;
+                    f.write_all(payload)?;
                     self.stored_pos += (CHUNK_HEADER_SIZE + payload.len()) as u64;
                     self.dedup.insert(&plan.hash, stored_off);
                     miss_stored[ordinal] = stored_off;
@@ -1410,8 +1440,10 @@ impl StreamWriter {
         b.extend_from_slice(&raw_off.to_le_bytes());
         b.extend_from_slice(&raw_len.to_le_bytes());
         b.extend_from_slice(&sha256);
-        if self.files_spill.write_all(&b).is_ok() {
-            self.files_count += 1;
+        if let Some(ref mut spill) = self.files_spill {
+            if spill.write_all(&b).is_ok() {
+                self.files_count += 1;
+            }
         }
     }
 
@@ -1433,6 +1465,8 @@ impl StreamWriter {
 
 impl Drop for StreamWriter {
     fn drop(&mut self) {
+        drop(self.file.take());
+        drop(self.files_spill.take());
         if !self.finished {
             if self.in_append {
                 // Доклейка: архив остаётся усечённым (трейлер срезан) — это
@@ -1744,13 +1778,13 @@ impl Read for SyntheticStream {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static SW_HRV_TEST_CTR: AtomicU64 = AtomicU64::new(1);
 
     fn tmp(name: &str) -> PathBuf {
-        // Уникальный каталог на поток: модуль-близнец
-        // archive::stream_writer использует те же имена файлов,
-        // параллельные тесты гонялись за один путь (NotFound).
+        let seq = SW_HRV_TEST_CTR.fetch_add(1, Ordering::Relaxed);
         let tid = format!("{:?}", std::thread::current().id());
-        let d = std::env::temp_dir().join(format!("poler-sw-{}-{}", std::process::id(), tid));
+        let d = std::env::temp_dir().join(format!("poler-sw-hrv-{}-{}-{}", std::process::id(), tid, seq));
         std::fs::create_dir_all(&d).unwrap();
         d.join(name)
     }

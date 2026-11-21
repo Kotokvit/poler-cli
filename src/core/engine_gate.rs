@@ -748,7 +748,11 @@ mod tests {
     use super::*;
 
     fn engine_bin() -> Option<PathBuf> {
-        find_engine_bin()
+        let b = find_engine_bin()?;
+        if b.file_name().map(|n| n.to_string_lossy().contains("my-engine")).unwrap_or(false) {
+            return None;
+        }
+        Some(b)
     }
 
     #[test]

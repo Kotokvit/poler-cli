@@ -382,10 +382,10 @@ fn run_grep_cli(args: &[String]) -> ExitCode {
 
     match grep_run(&roots, &cfg) {
         Ok(rep) => {
-            // Жук №1: обрезка по -m/max-results больше не молчит.
+            // Bug #1: truncation warning on max-results
             if rep.stats.truncated {
                 eprintln!(
-                    "poler grep: warning: вывод обрезан по --max-results {} (файлов доиграно до лимита: {}; поднимите --max-results или снимите лимит --max-results 0)",
+                    "poler grep: warning: output truncated at --max-results {} (files reached limit: {}; increase --max-results or use --max-results 0 for unlimited)",
                     cli.max_results,
                     rep.stats.files_truncated
                 );
@@ -603,7 +603,7 @@ fn run_scan_cli(args: &[String]) -> ExitCode {
 
     if cli.verbose {
         eprintln!(
-            "poler scan: файлов={}, с совпадениями={}, токенов={}, хитов={}, узлов графа={}, рёбер={}, время={}мс",
+            "poler scan: files={}, with_hits={}, tokens={}, hits={}, graph_nodes={}, edges={}, time={}ms",
             stats.files_scanned,
             stats.files_with_hits,
             stats.total_tokens,

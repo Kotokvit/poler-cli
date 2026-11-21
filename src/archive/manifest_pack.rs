@@ -39,14 +39,30 @@ trait WinFileExt {
 #[cfg(windows)]
 impl WinFileExt for std::fs::File {
     fn read_exact_at(&self, mut buf: &mut [u8], mut offset: u64) -> std::io::Result<()> {
+        use std::io::{Seek, SeekFrom};
         use std::os::windows::fs::FileExt;
+        let mut file_ref = self;
+        let orig_pos = file_ref.seek(SeekFrom::Current(0)).ok();
         while !buf.is_empty() {
             match self.seek_read(buf, offset) {
-                Ok(0) => return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "failed to fill whole buffer")),
+                Ok(0) => {
+                    if let Some(pos) = orig_pos {
+                        let _ = file_ref.seek(SeekFrom::Start(pos));
+                    }
+                    return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "failed to fill whole buffer"));
+                }
                 Ok(n) => { buf = &mut buf[n..]; offset += n as u64; }
                 Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {}
-                Err(e) => return Err(e),
+                Err(e) => {
+                    if let Some(pos) = orig_pos {
+                        let _ = file_ref.seek(SeekFrom::Start(pos));
+                    }
+                    return Err(e);
+                }
             }
+        }
+        if let Some(pos) = orig_pos {
+            let _ = file_ref.seek(SeekFrom::Start(pos));
         }
         Ok(())
     }
